@@ -28,11 +28,11 @@ namespace CHI {
 
                 namespace details {
 
-                    template<size_t I, class T, size_t M>
-                    inline consteval std::array<T, M> CopyOnWrite(std::array<T, M> a, T val) noexcept
+                    template<class T, size_t M>
+                    inline consteval std::array<T, M> CopyOnWrite(std::array<T, M> a, size_t index, T val) noexcept
                     {
                         std::array<T, M> result = a;
-                        result[I] = val;
+                        result[index] = val;
                         return result;
                     }
 
@@ -53,8 +53,7 @@ namespace CHI {
                         return result;
                     }
 
-                    template<CacheState S>
-                    inline consteval CacheState _NextState() noexcept
+                    inline consteval CacheState _NextState(CacheState S) noexcept
                     {
                         // C++20 is stupid to handle constexpr union here,
                         // so we have only this ungly choice
@@ -68,8 +67,7 @@ namespace CHI {
                         return CacheStates::None;
                     }
 
-                    template<CacheResp R>
-                    inline consteval CacheResp _NextResp() noexcept
+                    inline consteval CacheResp _NextResp(CacheResp R) noexcept
                     {
                         if (!R      ) return CacheResps::UC;
                         if (R.UC    ) return CacheResps::UCE;
@@ -195,10 +193,10 @@ namespace CHI {
                         std::array<TableG2Element, 7>   E   = {};
                     };
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0CompElement(TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0CompElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -207,22 +205,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0CompElement<N, Ts, R, _NextState<S>()>(E);
+                            return GetTableG0CompElement<N>(Ts, R, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0CompElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0CompElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R) noexcept
                     {
-                        return GetTableG0CompElement<N, Ts, R, _NextState<CacheStates::None>()>();
+                        return GetTableG0CompElement<N>(Ts, R, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0CompDataElement(TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0CompDataElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -231,22 +229,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0CompDataElement<N, Ts, R, _NextState<S>()>(E);
+                            return GetTableG0CompDataElement<N>(Ts, R, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0CompDataElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0CompDataElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R) noexcept
                     {
-                        return GetTableG0CompDataElement<N, Ts, R, _NextState<CacheStates::None>()>();
+                        return GetTableG0CompDataElement<N>(Ts, R, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0DataSepRespElement(TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0DataSepRespElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -255,22 +253,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0DataSepRespElement<N, Ts, R, _NextState<S>()>(E);
+                            return GetTableG0DataSepRespElement<N>(Ts, R, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0DataSepRespElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0DataSepRespElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R) noexcept
                     {
-                        return GetTableG0DataSepRespElement<N, Ts, R, _NextState<CacheStates::None>()>();
+                        return GetTableG0DataSepRespElement<N>(Ts, R, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0CopyBackWrDataElement(TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0CopyBackWrDataElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             // NOTICE: 'initialPermittedState' here stands for state 'before WriteData response'.
                             //         Since initial state checks were not done by TableG0, and cacheable writes
@@ -285,22 +283,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0CopyBackWrDataElement<N, Ts, R, _NextState<S>()>(E);
+                            return GetTableG0CopyBackWrDataElement<N>(Ts, R, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0CopyBackWrDataElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0CopyBackWrDataElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R) noexcept
                     {
-                        return GetTableG0CopyBackWrDataElement<N, Ts, R, _NextState<CacheStates::None>()>();
+                        return GetTableG0CopyBackWrDataElement<N>(Ts, R, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0MakeReadUniqueCompElement(TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0MakeReadUniqueCompElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             // NOTICE: 'initialPermittedState' here stands for state 'at time of response'.
                             //         Since initial state checks were not done by TableG0, and cacheable writes
@@ -315,22 +313,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0MakeReadUniqueCompElement<N, Ts, R, _NextState<S>()>(E);
+                            return GetTableG0MakeReadUniqueCompElement<N>(Ts, R, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0MakeReadUniqueCompElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0MakeReadUniqueCompElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R) noexcept
                     {
-                        return GetTableG0MakeReadUniqueCompElement<N, Ts, R, _NextState<CacheStates::None>()>();
+                        return GetTableG0MakeReadUniqueCompElement<N>(Ts, R, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0MakeReadUniqueCompDataElement(TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0MakeReadUniqueCompDataElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             // NOTICE: @see: GetTableG0MakeReadUniqueCompElement
 
@@ -341,22 +339,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0MakeReadUniqueCompDataElement<N, Ts, R, _NextState<S>()>(E);
+                            return GetTableG0MakeReadUniqueCompDataElement<N>(Ts, R, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0MakeReadUniqueCompDataElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0MakeReadUniqueCompDataElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R) noexcept
                     {
-                        return GetTableG0MakeReadUniqueCompDataElement<N, Ts, R, _NextState<CacheStates::None>()>();
+                        return GetTableG0MakeReadUniqueCompDataElement<N>(Ts, R, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0MakeReadUniqueDataSepRespElement(TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0MakeReadUniqueDataSepRespElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             // NOTICE: @see: GetTableG0MakeReadUniqueCompElement
 
@@ -367,22 +365,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0MakeReadUniqueDataSepRespElement<N, Ts, R, _NextState<S>()>(E);
+                            return GetTableG0MakeReadUniqueDataSepRespElement<N>(Ts, R, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0MakeReadUniqueDataSepRespElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0MakeReadUniqueDataSepRespElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R) noexcept
                     {
-                        return GetTableG0MakeReadUniqueDataSepRespElement<N, Ts, R, _NextState<CacheStates::None>()>();
+                        return GetTableG0MakeReadUniqueDataSepRespElement<N>(Ts, R, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0SnpRespElement(RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -391,22 +389,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0SnpRespElement<N, Ts, R, _NextState<S>()>(retToSrc, E);
+                            return GetTableG0SnpRespElement<N>(Ts, R, _NextState(S), retToSrc, E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0SnpRespElement(RetToSrc retToSrc) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespElement<N, Ts, R, _NextState<CacheStates::None>()>(retToSrc);
+                        return GetTableG0SnpRespElement<N>(Ts, R, _NextState(CacheStates::None), retToSrc);
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0SnpRespDataElement(RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespDataElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -415,22 +413,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0SnpRespDataElement<N, Ts, R, _NextState<S>()>(retToSrc, E);
+                            return GetTableG0SnpRespDataElement<N>(Ts, R, _NextState(S), retToSrc, E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0SnpRespDataElement(RetToSrc retToSrc) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespDataElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespDataElement<N, Ts, R, _NextState<CacheStates::None>()>(retToSrc);
+                        return GetTableG0SnpRespDataElement<N>(Ts, R, _NextState(CacheStates::None), retToSrc);
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0SnpRespDataPtlElement(RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespDataPtlElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -439,22 +437,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0SnpRespDataPtlElement<N, Ts, R, _NextState<S>()>(retToSrc, E);
+                            return GetTableG0SnpRespDataPtlElement<N>(Ts, R, _NextState(S), retToSrc, E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0SnpRespDataPtlElement(RetToSrc retToSrc) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespDataPtlElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespDataPtlElement<N, Ts, R, _NextState<CacheStates::None>()>(retToSrc);
+                        return GetTableG0SnpRespDataPtlElement<N>(Ts, R, _NextState(CacheStates::None), retToSrc);
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0SnpRespFwdedElement(RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespFwdedElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -463,22 +461,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0SnpRespFwdedElement<N, Ts, R, _NextState<S>()>(retToSrc, E);
+                            return GetTableG0SnpRespFwdedElement<N>(Ts, R, _NextState(S), retToSrc, E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0SnpRespFwdedElement(RetToSrc retToSrc) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespFwdedElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespFwdedElement<N, Ts, R, _NextState<CacheStates::None>()>(retToSrc);
+                        return GetTableG0SnpRespFwdedElement<N>(Ts, R, _NextState(CacheStates::None), retToSrc);
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG0Element GetTableG0SnpRespDataFwdedElement(RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespDataFwdedElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, RetToSrc retToSrc, TableG0Element E = TableG0Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -487,22 +485,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG0SnpRespDataFwdedElement<N, Ts, R, _NextState<S>()>(retToSrc, E);
+                            return GetTableG0SnpRespDataFwdedElement<N>(Ts, R, _NextState(S), retToSrc, E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG0Element GetTableG0SnpRespDataFwdedElement(RetToSrc retToSrc) noexcept
+                    template<size_t N>
+                    inline consteval TableG0Element GetTableG0SnpRespDataFwdedElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespDataFwdedElement<N, Ts, R, _NextState<CacheStates::None>()>(retToSrc);
+                        return GetTableG0SnpRespDataFwdedElement<N>(Ts, R, _NextState(CacheStates::None), retToSrc);
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG1Element GetTableG1SnpRespFwdedElement(RetToSrc retToSrc, TableG1Element E = TableG1Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG1Element GetTableG1SnpRespFwdedElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, RetToSrc retToSrc, TableG1Element E = TableG1Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheResp resp = CacheResps::None;
                             for (CacheStateTransition T : Ts)
@@ -511,22 +509,22 @@ namespace CHI {
 
                             E.resps[GetStateTableIndex(S)] = resp;
 
-                            return GetTableG1SnpRespFwdedElement<N, Ts, R, _NextState<S>()>(retToSrc, E);
+                            return GetTableG1SnpRespFwdedElement<N>(Ts, R, _NextState(S), retToSrc, E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG1Element GetTableG1SnpRespFwdedElement(RetToSrc retToSrc) noexcept
+                    template<size_t N>
+                    inline consteval TableG1Element GetTableG1SnpRespFwdedElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG1SnpRespFwdedElement<N, Ts, R, _NextState<CacheStates::None>()>(retToSrc);
+                        return GetTableG1SnpRespFwdedElement<N>(Ts, R, _NextState(CacheStates::None), retToSrc);
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R, CacheState S>
-                    inline consteval TableG1Element GetTableG1SnpRespDataFwdedElement(RetToSrc retToSrc, TableG1Element E = TableG1Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG1Element GetTableG1SnpRespDataFwdedElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, CacheState S, RetToSrc retToSrc, TableG1Element E = TableG1Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheResp resp = CacheResps::None;
                             for (CacheStateTransition T : Ts)
@@ -535,22 +533,22 @@ namespace CHI {
 
                             E.resps[GetStateTableIndex(S)] = resp;
 
-                            return GetTableG1SnpRespDataFwdedElement<N, Ts, R, _NextState<S>()>(retToSrc, E);
+                            return GetTableG1SnpRespDataFwdedElement<N>(Ts, R, _NextState(S), retToSrc, E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheResp R>
-                    inline consteval TableG1Element GetTableG1SnpRespDataFwdedElement(RetToSrc retToSrc) noexcept
+                    template<size_t N>
+                    inline consteval TableG1Element GetTableG1SnpRespDataFwdedElement(const std::array<CacheStateTransition, N>& Ts, CacheResp R, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG1SnpRespDataFwdedElement<N, Ts, R, _NextState<CacheStates::None>()>(retToSrc);
+                        return GetTableG1SnpRespDataFwdedElement<N>(Ts, R, _NextState(CacheStates::None), retToSrc);
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheState Si, CacheState S>
-                    inline consteval TableG2Element GetTableG2MakeReadUniqueElement(TableG2Element E = TableG2Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG2Element GetTableG2MakeReadUniqueElement(const std::array<CacheStateTransition, N>& Ts, CacheState Si, CacheState S, TableG2Element E = TableG2Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -559,22 +557,22 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG2MakeReadUniqueElement<N, Ts, Si, _NextState<S>()>(E);
+                            return GetTableG2MakeReadUniqueElement<N>(Ts, Si, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheState Si>
-                    inline consteval TableG2Element GetTableG2MakeReadUniqueElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG2Element GetTableG2MakeReadUniqueElement(const std::array<CacheStateTransition, N>& Ts, CacheState Si) noexcept
                     {
-                        return GetTableG2MakeReadUniqueElement<N, Ts, Si, _NextState<CacheStates::None>()>();
+                        return GetTableG2MakeReadUniqueElement<N>(Ts, Si, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheState Si, CacheState S>
-                    inline consteval TableG2Element GetTableG2WriteElement(TableG2Element E = TableG2Element()) noexcept
+                    template<size_t N>
+                    inline consteval TableG2Element GetTableG2WriteElement(const std::array<CacheStateTransition, N>& Ts, CacheState Si, CacheState S, TableG2Element E = TableG2Element()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheState state = CacheStates::None;
                             for (CacheStateTransition T : Ts)
@@ -583,408 +581,321 @@ namespace CHI {
 
                             E.states[GetStateTableIndex(S)] = state;
 
-                            return GetTableG2WriteElement<N, Ts, Si, _NextState<S>()>(E);
+                            return GetTableG2WriteElement<N>(Ts, Si, _NextState(S), E);
                         }
                         else
                             return E;
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheState Si>
-                    inline consteval TableG2Element GetTableG2WriteElement() noexcept
+                    template<size_t N>
+                    inline consteval TableG2Element GetTableG2WriteElement(const std::array<CacheStateTransition, N>& Ts, CacheState Si) noexcept
                     {
-                        return GetTableG2WriteElement<N, Ts, Si, _NextState<CacheStates::None>()>();
+                        return GetTableG2WriteElement<N>(Ts, Si, _NextState(CacheStates::None));
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0Comp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0Comp(const std::array<CacheStateTransition, N>& Ts, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG0CompElement<N, Ts, R>());
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0CompElement<N>(Ts, R));
 
-                            return GetTableG0Comp<N, Ts, _NextResp<R>(), nextA>();
+                            return GetTableG0Comp<N>(Ts, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0CompData() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0CompData(const std::array<CacheStateTransition, N>& Ts, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG0CompDataElement<N, Ts, R>());
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0CompDataElement<N>(Ts, R));
 
-                            return GetTableG0CompData<N, Ts, _NextResp<R>(), nextA>();
+                            return GetTableG0CompData<N>(Ts, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0DataSepResp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0DataSepResp(const std::array<CacheStateTransition, N>& Ts, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG0DataSepRespElement<N, Ts, R>());
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0DataSepRespElement<N>(Ts, R));
 
-                            return GetTableG0DataSepResp<N, Ts, _NextResp<R>(), nextA>();
+                            return GetTableG0DataSepResp<N>(Ts, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0CopyBackWrData() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0CopyBackWrData(const std::array<CacheStateTransition, N>& Ts, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A,
-                                GetTableG0CopyBackWrDataElement<N, Ts, R>());
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0CopyBackWrDataElement<N>(Ts, R));
 
-                            return GetTableG0CopyBackWrData<N, Ts, _NextResp<R>(), nextA>();
+                            return GetTableG0CopyBackWrData<N>(Ts, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0MakeReadUniqueComp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0MakeReadUniqueComp(const std::array<CacheStateTransition, N>& Ts, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG0MakeReadUniqueCompElement<N, Ts, R>());
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0MakeReadUniqueCompElement<N>(Ts, R));
 
-                            return GetTableG0MakeReadUniqueComp<N, Ts, _NextResp<R>(), nextA>();
+                            return GetTableG0MakeReadUniqueComp<N>(Ts, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0MakeReadUniqueCompData() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0MakeReadUniqueCompData(const std::array<CacheStateTransition, N>& Ts, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG0MakeReadUniqueCompDataElement<N, Ts, R>());
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0MakeReadUniqueCompDataElement<N>(Ts, R));
 
-                            return GetTableG0MakeReadUniqueCompData<N, Ts, _NextResp<R>(), nextA>();
+                            return GetTableG0MakeReadUniqueCompData<N>(Ts, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0MakeReadUniqueDataSepResp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0MakeReadUniqueDataSepResp(const std::array<CacheStateTransition, N>& Ts, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG0MakeReadUniqueDataSepRespElement<N, Ts, R>());
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0MakeReadUniqueDataSepRespElement<N>(Ts, R));
 
-                            return GetTableG0MakeReadUniqueDataSepResp<N, Ts, _NextResp<R>(), nextA>();
+                            return GetTableG0MakeReadUniqueDataSepResp<N>(Ts, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        RetToSrc retToSrc,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0SnpResp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpResp(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG0SnpRespElement<N, Ts, R>(retToSrc));
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0SnpRespElement<N>(Ts, R, retToSrc));
 
-                            return GetTableG0SnpResp<N, Ts, retToSrc, _NextResp<R>(), nextA>();
+                            return GetTableG0SnpResp<N>(Ts, retToSrc, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        RetToSrc retToSrc,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0SnpRespData() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpRespData(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG0SnpRespDataElement<N, Ts, R>(retToSrc));
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0SnpRespDataElement<N>(Ts, R, retToSrc));
 
-                            return GetTableG0SnpRespData<N, Ts, retToSrc, _NextResp<R>(), nextA>();
+                            return GetTableG0SnpRespData<N>(Ts, retToSrc, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        RetToSrc retToSrc,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0SnpRespDataPtl() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpRespDataPtl(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A,
-                                GetTableG0SnpRespDataPtlElement<N, Ts, R>(retToSrc));
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0SnpRespDataPtlElement<N>(Ts, R, retToSrc));
 
-                            return GetTableG0SnpRespDataPtl<N, Ts, retToSrc, _NextResp<R>(), nextA>();
+                            return GetTableG0SnpRespDataPtl<N>(Ts, retToSrc, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        RetToSrc retToSrc,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0SnpRespFwded() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpRespFwded(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A,
-                                GetTableG0SnpRespFwdedElement<N, Ts, R>(retToSrc));
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0SnpRespFwdedElement<N>(Ts, R, retToSrc));
 
-                            return GetTableG0SnpRespFwded<N, Ts, retToSrc, _NextResp<R>(), nextA>();
+                            return GetTableG0SnpRespFwded<N>(Ts, retToSrc, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        RetToSrc retToSrc,
-                        CacheResp R,
-                        TableG0 A = TableG0()>
-                    inline consteval TableG0 GetTableG0SnpRespDataFwded() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpRespDataFwded(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc, CacheResp R, TableG0 A = TableG0()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A,
-                                GetTableG0SnpRespDataFwdedElement<N, Ts, R>(retToSrc));
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG0SnpRespDataFwdedElement<N>(Ts, R, retToSrc));
 
-                            return GetTableG0SnpRespDataFwded<N, Ts, retToSrc, _NextResp<R>(), nextA>();
+                            return GetTableG0SnpRespDataFwded<N>(Ts, retToSrc, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        RetToSrc retToSrc,
-                        CacheResp R,
-                        TableG1 A = TableG1()>
-                    inline consteval TableG1 GetTableG1SnpRespFwded() noexcept
+                    template<size_t N>
+                    inline consteval TableG1 GetTableG1SnpRespFwded(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc, CacheResp R, TableG1 A = TableG1()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG1SnpRespFwdedElement<N, Ts, R>(retToSrc));
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG1SnpRespFwdedElement<N>(Ts, R, retToSrc));
 
-                            return GetTableG1SnpRespFwded<N, Ts, retToSrc, _NextResp<R>(), nextA>();
+                            return GetTableG1SnpRespFwded<N>(Ts, retToSrc, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        RetToSrc retToSrc,
-                        CacheResp R,
-                        TableG1 A = TableG1()>
-                    inline consteval TableG1 GetTableG1SnpRespDataFwded() noexcept
+                    template<size_t N>
+                    inline consteval TableG1 GetTableG1SnpRespDataFwded(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc, CacheResp R, TableG1 A = TableG1()) noexcept
                     {
-                        if constexpr (R)
+                        if (R)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetRespTableIndex(R)>(A, 
-                                GetTableG1SnpRespDataFwdedElement<N, Ts, R>(retToSrc));
+                            auto nextA = CopyOnWrite(A, GetRespTableIndex(R), GetTableG1SnpRespDataFwdedElement<N>(Ts, R, retToSrc));
 
-                            return GetTableG1SnpRespDataFwded<N, Ts, retToSrc, _NextResp<R>(), nextA>();
+                            return GetTableG1SnpRespDataFwded<N>(Ts, retToSrc, _NextResp(R), nextA);
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheState Si,
-                        TableG2 A = TableG2()>
-                    inline consteval TableG2 GetTableG2MakeReadUnique() noexcept
+                    template<size_t N>
+                    inline consteval TableG2 GetTableG2MakeReadUnique(const std::array<CacheStateTransition, N>& Ts, CacheState Si, TableG2 A = TableG2()) noexcept
                     {
-                        if constexpr (Si)
+                        if (Si)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetStateTableIndex(Si)>(A.E,
-                                GetTableG2MakeReadUniqueElement<N, Ts, Si>());
+                            auto nextA = CopyOnWrite(A.E, GetStateTableIndex(Si), GetTableG2MakeReadUniqueElement<N>(Ts, Si));
 
-                            return GetTableG2MakeReadUnique<N, Ts, _NextState<Si>(), TableG2(true, nextA)>();
+                            return GetTableG2MakeReadUnique<N>(Ts, _NextState(Si), TableG2(true, nextA));
                         }
                         else
                             return A;
                     }
 
-                    template<
-                        size_t N,
-                        std::array<CacheStateTransition, N> Ts,
-                        CacheState Si,
-                        TableG2 A = TableG2()>
-                    inline consteval TableG2 GetTableG2Write() noexcept
+                    template<size_t N>
+                    inline consteval TableG2 GetTableG2Write(const std::array<CacheStateTransition, N>& Ts, CacheState Si, TableG2 A = TableG2()) noexcept
                     {
-                        if constexpr (Si)
+                        if (Si)
                         {
-                            constexpr auto nextA = CopyOnWrite<GetStateTableIndex(Si)>(A.E,
-                                GetTableG2WriteElement<N, Ts, Si>());
+                            auto nextA = CopyOnWrite(A.E, GetStateTableIndex(Si), GetTableG2WriteElement<N>(Ts, Si));
 
-                            return GetTableG2Write<N, Ts, _NextState<Si>(), TableG2(true, nextA)>();
+                            return GetTableG2Write<N>(Ts, _NextState(Si), TableG2(true, nextA));
                         }
                         else
                             return A;
                     }
 
                     //
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG0 GetTableG0Comp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0Comp(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG0Comp<N, Ts, _NextResp<CacheResps::None>()>();
+                        return GetTableG0Comp<N>(Ts, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG0 GetTableG0CompData() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0CompData(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG0CompData<N, Ts, _NextResp<CacheResps::None>()>();
+                        return GetTableG0CompData<N>(Ts, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG0 GetTableG0DataSepResp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0DataSepResp(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG0DataSepResp<N, Ts, _NextResp<CacheResps::None>()>();
+                        return GetTableG0DataSepResp<N>(Ts, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG0 GetTableG0CopyBackWrData() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0CopyBackWrData(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG0CopyBackWrData<N, Ts, _NextResp<CacheResps::None>()>();
+                        return GetTableG0CopyBackWrData<N>(Ts, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG0 GetTableG0MakeReadUniqueComp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0MakeReadUniqueComp(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG0MakeReadUniqueComp<N, Ts, _NextResp<CacheResps::None>()>();
+                        return GetTableG0MakeReadUniqueComp<N>(Ts, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG0 GetTableG0MakeReadUniqueCompData() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0MakeReadUniqueCompData(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG0MakeReadUniqueCompData<N, Ts, _NextResp<CacheResps::None>()>();
+                        return GetTableG0MakeReadUniqueCompData<N>(Ts, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG0 GetTableG0MakeReadUniqueDataSepResp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0MakeReadUniqueDataSepResp(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG0MakeReadUniqueDataSepResp<N, Ts, _NextResp<CacheResps::None>()>();
+                        return GetTableG0MakeReadUniqueDataSepResp<N>(Ts, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, RetToSrc retToSrc>
-                    inline consteval TableG0 GetTableG0SnpResp() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpResp(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpResp<N, Ts, retToSrc, _NextResp<CacheResps::None>()>();
+                        return GetTableG0SnpResp<N>(Ts, retToSrc, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, RetToSrc retToSrc>
-                    inline consteval TableG0 GetTableG0SnpRespData() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpRespData(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespData<N, Ts, retToSrc, _NextResp<CacheResps::None>()>();
+                        return GetTableG0SnpRespData<N>(Ts, retToSrc, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, RetToSrc retToSrc>
-                    inline consteval TableG0 GetTableG0SnpRespDataPtl() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpRespDataPtl(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespDataPtl<N, Ts, retToSrc, _NextResp<CacheResps::None>()>();
+                        return GetTableG0SnpRespDataPtl<N>(Ts, retToSrc, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, RetToSrc retToSrc>
-                    inline consteval TableG0 GetTableG0SnpRespFwded() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpRespFwded(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespFwded<N, Ts, retToSrc, _NextResp<CacheResps::None>()>();
+                        return GetTableG0SnpRespFwded<N>(Ts, retToSrc, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, RetToSrc retToSrc>
-                    inline consteval TableG0 GetTableG0SnpRespDataFwded() noexcept
+                    template<size_t N>
+                    inline consteval TableG0 GetTableG0SnpRespDataFwded(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG0SnpRespDataFwded<N, Ts, retToSrc, _NextResp<CacheResps::None>()>();
+                        return GetTableG0SnpRespDataFwded<N>(Ts, retToSrc, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, RetToSrc retToSrc>
-                    inline consteval TableG1 GetTableG1SnpRespFwded() noexcept
+                    template<size_t N>
+                    inline consteval TableG1 GetTableG1SnpRespFwded(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG1SnpRespFwded<N, Ts, retToSrc, _NextResp<CacheResps::None>()>();
+                        return GetTableG1SnpRespFwded<N>(Ts, retToSrc, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, RetToSrc retToSrc>
-                    inline consteval TableG1 GetTableG1SnpRespDataFwded() noexcept
+                    template<size_t N>
+                    inline consteval TableG1 GetTableG1SnpRespDataFwded(const std::array<CacheStateTransition, N>& Ts, RetToSrc retToSrc) noexcept
                     {
-                        return GetTableG1SnpRespDataFwded<N, Ts, retToSrc, _NextResp<CacheResps::None>()>();
+                        return GetTableG1SnpRespDataFwded<N>(Ts, retToSrc, _NextResp(CacheResps::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG2 GetTableG2MakeReadUnique() noexcept
+                    template<size_t N>
+                    inline consteval TableG2 GetTableG2MakeReadUnique(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG2MakeReadUnique<N, Ts, _NextState<CacheStates::None>()>();
+                        return GetTableG2MakeReadUnique<N>(Ts, _NextState(CacheStates::None));
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableG2 GetTableG2Write() noexcept
+                    template<size_t N>
+                    inline consteval TableG2 GetTableG2Write(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableG2Write<N, Ts, _NextState<CacheStates::None>()>();
+                        return GetTableG2Write<N>(Ts, _NextState(CacheStates::None));
                     }
                     /**/
 
@@ -1401,55 +1312,55 @@ namespace CHI {
                 };
 
                 #define _Tables_Dataless(opcode) TablesDataless( \
-                    details::GetTableG0Comp<Transitions::opcode.size(), Transitions::opcode>() \
+                    details::GetTableG0Comp<Transitions::opcode.size()>(Transitions::opcode) \
                 )
 
                 #define _Tables_Read(opcode) TablesRead( \
-                    details::GetTableG0CompData<Transitions::opcode.size(), Transitions::opcode>(), \
-                    details::GetTableG0DataSepResp<Transitions::opcode.size(), Transitions::opcode>() \
+                    details::GetTableG0CompData<Transitions::opcode.size()>(Transitions::opcode), \
+                    details::GetTableG0DataSepResp<Transitions::opcode.size()>(Transitions::opcode) \
                 )
                 
                 #define _Tables_MakeReadUnique(opcode) TablesMakeReadUnique( \
-                    details::GetTableG0MakeReadUniqueComp<Transitions::opcode.size(), Transitions::opcode>(), \
-                    details::GetTableG0MakeReadUniqueCompData<Transitions::opcode.size(), Transitions::opcode>(), \
-                    details::GetTableG0MakeReadUniqueDataSepResp<Transitions::opcode.size(), Transitions::opcode>() \
+                    details::GetTableG0MakeReadUniqueComp<Transitions::opcode.size()>(Transitions::opcode), \
+                    details::GetTableG0MakeReadUniqueCompData<Transitions::opcode.size()>(Transitions::opcode), \
+                    details::GetTableG0MakeReadUniqueDataSepResp<Transitions::opcode.size()>(Transitions::opcode) \
                 )
 
                 #define _Tables_WriteCopyBack(opcode) TablesWrite( \
-                    details::GetTableG0CopyBackWrData<Transitions::opcode.size(), Transitions::opcode>() \
+                    details::GetTableG0CopyBackWrData<Transitions::opcode.size()>(Transitions::opcode) \
                 )
 
                 #define _Tables_WriteNonCopyBack(opcode) TablesWriteNonCopyBack()
 
                 #define _Tables_Atomic(opcode) TablesAtomic( \
-                    details::GetTableG0Comp<Transitions::opcode.size(), Transitions::opcode>(), \
-                    details::GetTableG0CompData<Transitions::opcode.size(), Transitions::opcode>() \
+                    details::GetTableG0Comp<Transitions::opcode.size()>(Transitions::opcode), \
+                    details::GetTableG0CompData<Transitions::opcode.size()>(Transitions::opcode) \
                 )
 
                 #define _Tables_SnpX(opcode) TablesSnpX( \
-                    details::GetTableG0SnpResp<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG0SnpResp<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>(), \
-                    details::GetTableG0SnpRespData<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG0SnpRespData<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>(), \
-                    details::GetTableG0SnpRespDataPtl<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG0SnpRespDataPtl<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>() \
+                    details::GetTableG0SnpResp<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG0SnpResp<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1), \
+                    details::GetTableG0SnpRespData<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG0SnpRespData<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1), \
+                    details::GetTableG0SnpRespDataPtl<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG0SnpRespDataPtl<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1) \
                 )
 
                 #define _Tables_SnpXFwd(opcode) TablesSnpXFwd( \
-                    details::GetTableG0SnpResp<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG0SnpResp<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>(), \
-                    details::GetTableG0SnpRespData<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG0SnpRespData<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>(), \
-                    details::GetTableG1SnpRespFwded<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG1SnpRespFwded<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>(), \
-                    details::GetTableG1SnpRespDataFwded<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG1SnpRespDataFwded<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>(), \
-                    details::GetTableG0SnpRespDataPtl<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG0SnpRespDataPtl<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>(), \
-                    details::GetTableG0SnpRespFwded<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG0SnpRespFwded<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>(), \
-                    details::GetTableG0SnpRespDataFwded<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A0>(), \
-                    details::GetTableG0SnpRespDataFwded<Transitions::opcode.size(), Transitions::opcode, RetToSrcs::A1>() \
+                    details::GetTableG0SnpResp<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG0SnpResp<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1), \
+                    details::GetTableG0SnpRespData<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG0SnpRespData<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1), \
+                    details::GetTableG1SnpRespFwded<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG1SnpRespFwded<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1), \
+                    details::GetTableG1SnpRespDataFwded<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG1SnpRespDataFwded<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1), \
+                    details::GetTableG0SnpRespDataPtl<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG0SnpRespDataPtl<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1), \
+                    details::GetTableG0SnpRespFwded<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG0SnpRespFwded<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1), \
+                    details::GetTableG0SnpRespDataFwded<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A0), \
+                    details::GetTableG0SnpRespDataFwded<Transitions::opcode.size()>(Transitions::opcode, RetToSrcs::A1) \
                 )
 
                 // Intermediate tables for Read request transactions
@@ -1540,8 +1451,8 @@ namespace CHI {
                 namespace Nested {
 
                     #define _TableG2_General(opcode)        { false, {} }
-                    #define _TableG2_MakeReadUnique(opcode) details::GetTableG2MakeReadUnique<Transitions::opcode.size(), Transitions::opcode>()
-                    #define _TableG2_Write(opcode)          details::GetTableG2Write<Transitions::opcode.size(), Transitions::opcode>()
+                    #define _TableG2_MakeReadUnique(opcode) details::GetTableG2MakeReadUnique<Transitions::opcode.size()>(Transitions::opcode)
+                    #define _TableG2_Write(opcode)          details::GetTableG2Write<Transitions::opcode.size()>(Transitions::opcode)
                     
                     // Nested transitions tables for Read request transactions
                     constexpr details::TableG2 ReadNoSnp                        = _TableG2_General(ReadNoSnp);

@@ -40,8 +40,7 @@ namespace CHI {
                         }) {}
                     };
 
-                    template<CacheState S>
-                    inline consteval CacheState _NextState() noexcept
+                    inline consteval CacheState _NextState(CacheState S) noexcept
                     {
                         // C++20 is stupid to handle constexpr union here,
                         // so we have only this ungly choice
@@ -86,10 +85,10 @@ namespace CHI {
                             );
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts, CacheState S>
-                    inline consteval TableR0 GetTableR0CompDataDCT(TableR0 A = TableR0()) noexcept
+                    template<size_t N>
+                    inline consteval TableR0 GetTableR0CompDataDCT(const std::array<CacheStateTransition, N>& Ts, CacheState S, TableR0 A = TableR0()) noexcept
                     {
-                        if constexpr (S)
+                        if (S)
                         {
                             CacheResp resp = CacheResps::None;
                             for (CacheStateTransition T : Ts)
@@ -98,7 +97,7 @@ namespace CHI {
 
                             A.resps[GetStateTableIndex(S)] = resp;
 
-                            return GetTableR0CompDataDCT<N, Ts, _NextState<S>()>(A);
+                            return GetTableR0CompDataDCT<N>(Ts, _NextState(S), A);
                         }
                         else
                             return A;
@@ -117,10 +116,10 @@ namespace CHI {
                         return GetRespFromR0(e);
                     }
 
-                    template<size_t N, std::array<CacheStateTransition, N> Ts>
-                    inline consteval TableR0 GetTableR0CompDataDCT() noexcept
+                    template<size_t N>
+                    inline consteval TableR0 GetTableR0CompDataDCT(const std::array<CacheStateTransition, N>& Ts) noexcept
                     {
-                        return GetTableR0CompDataDCT<N, Ts, _NextState<CacheStates::None>()>();
+                        return GetTableR0CompDataDCT<N>(Ts, _NextState(CacheStates::None));
                     }
 
                     inline constexpr CacheResp ProductR0(const CacheState P, const TableR0& R0) noexcept
@@ -136,7 +135,7 @@ namespace CHI {
                     }
                 }
 
-                #define _Table_DCT(opcode)     details::GetTableR0CompDataDCT<Transitions::opcode.size(), Transitions::opcode>()
+                #define _Table_DCT(opcode)     details::GetTableR0CompDataDCT<Transitions::opcode.size()>(Transitions::opcode)
 
                 // Response states for Snoop Forward transactions
                 constexpr details::TableR0   SnpOnceFwd                  = _Table_DCT(SnpOnceFwd);

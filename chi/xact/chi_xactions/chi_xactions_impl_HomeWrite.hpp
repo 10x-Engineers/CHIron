@@ -197,7 +197,17 @@ namespace /*CHI::*/Xact {
                         this->first.flit.req.Size(), iter->flit.dat.DataID());
             }
             else if (iter->flit.dat.Opcode() == Opcodes::DAT::WriteDataCancel)
-                return true;
+                // LOCAL PATCH (amba-chi-vip, 2026-07-08): a WriteDataCancel does NOT
+                // complete a multi-packet write on its first beat. CHI E.b Sec 4.5
+                // (WriteDataCancel): "All data packets originally intended to be
+                // transferred must be sent" -- a cancelled >32B Ptl write sends one
+                // WriteDataCancel per data packet (Sec 2.10.4 / Table 2-15). The
+                // original `return true;` retired the transaction after the first
+                // cancel beat, so the mandatory subsequent beat(s) were denied
+                // DENIED_DAT_TXNID_NOT_EXIST (rc=59). Accumulate DataIDs exactly like
+                // NonCopyBackWrData so completion requires the full size-derived mask.
+                collectedDataID |= details::CollectDataID<config>(
+                        this->first.flit.req.Size(), iter->flit.dat.DataID());
         }
 
         return (completeDataIDMask & ~collectedDataID).none();
