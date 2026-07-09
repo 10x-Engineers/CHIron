@@ -42,10 +42,10 @@ namespace CHI {
                 // ReadOnce             | I [, UCE]     | -          | I     | CompData_UC,   | RespSepData +
                 //                      |               |            |       | CompData_I     | DataSepResp_UC
                 // NOTE (10x): CHI E.b (IHI0050E.b) §4.2.1 Table 4-4 (p.4-166) permits initial state
-                //   I *and* UCE for ReadOnce*. CHIron ERRATA #1 restricts to I only (Issue-G rule).
-                //   Default here = E.b (I|UCE); define CHI_ERRATA_READONCE_I_ONLY for Issue-G behavior.
+                //   I *and* UCE for ReadOnce*. CHIron ERRATA #1 restricted this to I only (Issue-G rule);
+                //   patched directly to E.b (I|UCE) here — no opt-out. Deviation-catalog row 1.
                 constexpr CacheStateTransition ReadOnce_I_to_I = {
-#if defined(CHI_ISSUE_EB_ENABLE) && !defined(CHI_ERRATA_READONCE_I_ONLY)
+#ifdef CHI_ISSUE_EB_ENABLE
                     CacheStateTransition(I | UCE, I).TypeRead()
 #else
                     CacheStateTransition(I, I).TypeRead()
@@ -61,10 +61,10 @@ namespace CHI {
                 // ReadOnceCleanInvalid | I             | -          | I     | CompData_UC,   | RespSepData + 
                 //                      |               |            |       | CompData_I     | DataSepResp_UC
                 constexpr CacheStateTransition ReadOnceCleanInvalid_I_to_I = {
-#if defined(CHI_ISSUE_EB_ENABLE) && !defined(CHI_ERRATA_READONCE_I_ONLY)
+#ifdef CHI_ISSUE_EB_ENABLE
                     CacheStateTransition(I | UCE, I).TypeRead()   // E.b Table 4-4: I or UCE
 #else
-                    CacheStateTransition(I, I).TypeRead()          // Issue-G errata: I only
+                    CacheStateTransition(I, I).TypeRead()          // Issue-B: I only
 #endif
                         .CompData(I | UC)
                         .DataSepResp(UC)
@@ -77,10 +77,10 @@ namespace CHI {
                 // ReadOnceMakeInvalid  | I             | -          | I     | CompData_UC,   | RespSepData + 
                 //                      |               |            |       | CompData_I     | DataSepResp_UC
                 constexpr CacheStateTransition ReadOnceMakeInvalid_I_to_I = {
-#if defined(CHI_ISSUE_EB_ENABLE) && !defined(CHI_ERRATA_READONCE_I_ONLY)
+#ifdef CHI_ISSUE_EB_ENABLE
                     CacheStateTransition(I | UCE, I).TypeRead()   // E.b Table 4-4: I or UCE
 #else
-                    CacheStateTransition(I, I).TypeRead()          // Issue-G errata: I only
+                    CacheStateTransition(I, I).TypeRead()          // Issue-B: I only
 #endif
                         .CompData(I | UC)
                         .DataSepResp(UC)
