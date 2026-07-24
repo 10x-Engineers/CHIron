@@ -101,7 +101,7 @@ namespace /*CHI::*/Xact {
             this->first.flit.req.Opcode() != Opcodes::REQ::ReadNoSnp
          && this->first.flit.req.Opcode() != Opcodes::REQ::ReadOnce
          && this->first.flit.req.Opcode() != Opcodes::REQ::ReadOnceCleanInvalid
-         && this->first.flit.req.Opcode() != Opcodes::REQ::ReadOnceMakeInvalid 
+         && this->first.flit.req.Opcode() != Opcodes::REQ::ReadOnceMakeInvalid
         ) [[unlikely]]
         {
             this->firstDenial = this->RequestFlitDenied(XactDenial::DENIED_REQ_OPCODE, this->first,
@@ -380,6 +380,47 @@ namespace /*CHI::*/Xact {
             return XactDenial::ACCEPTED;
         }
 #endif
+        else if (rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompAck)
+        {
+            // CHI E.b Table 2-8 (p.2-117): CompAck is OPTIONAL for ReadNoSnp/
+            // ReadOnce*, so a Requester that asserted ExpCompAck must be allowed to
+            // send it (e.g. the DMT completion leg). Same acceptance rules as an
+            // Allocating Read's CompAck: RN->HN, after CompData/RespSepData, and
+            // TxnID == the DBID carried on that data/response. The completion side
+            // (IsAckComplete/IsComplete) already models this CompAck when
+            // ExpCompAck is set -- only this acceptance dispatch was missing.
+            if (!rspFlit.IsFromRequesterToHome(glbl))
+                return this->ResponseFlitDenied(XactDenial::DENIED_RSP_NOT_FROM_RN_TO_HN, rspFlit);
+
+            if (
+                !this->HasDAT({ Opcodes::DAT::CompData })
+#ifdef CHI_ISSUE_EB_ENABLE
+             && !this->HasRSP({ Opcodes::RSP::RespSepData })
+#endif
+            )
+#ifdef CHI_ISSUE_EB_ENABLE
+                return XactDenial::DENIED_COMPACK_BEFORE_COMPDATA_OR_RESPSEPDATA;
+#else
+                return XactDenial::DENIED_COMPACK_BEFORE_COMPDATA;
+#endif
+
+            auto optDBID = this->GetDBID();
+
+            if (!optDBID)
+                return XactDenial::DENIED_COMPACK_BEFORE_DBID;
+
+            if (rspFlit.flit.rsp.TxnID() != *optDBID)
+                return XactDenial::DENIED_RSP_TXNID_MISMATCHING_DBID;
+
+            if (glbl.CHECK_FIELD_MAPPING.enable)
+            {
+                XactDenialEnum denial = glbl.CHECK_FIELD_MAPPING.Check(rspFlit.flit.rsp);
+                if (denial != XactDenial::ACCEPTED)
+                    return denial;
+            }
+
+            return XactDenial::ACCEPTED;
+        }
 
         return this->ResponseFlitDenied(XactDenial::DENIED_RSP_OPCODE, rspFlit,
             "This RSP Opcode is not expected for Non-Allocating Read transactions");
