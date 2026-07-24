@@ -204,29 +204,18 @@ namespace /*CHI::*/Xact {
     inline bool XactionCopyBackWrite<config>::IsAckComplete(const Global<config>& glbl) const noexcept
     {
 #ifdef CHI_ISSUE_EB_ENABLE
-        // WriteEvictOrEvict only
+        // WriteEvictOrEvict only: ack-complete requires the Requester to have
+        // actually SENT CompAck (Table 2-8 MUST, ExpCompAck=1 for this opcode) --
+        // CompDBIDResp is the Home's completion response and is already what
+        // IsResponseComplete()/IsDataComplete() key off of; it must not also
+        // satisfy the ack leg, or the transaction retires before the CompAck it
+        // is still waiting for ever arrives. CompAck can only ever be recorded
+        // Requester->Home (NextRSPNoRecord denies any other direction), so
+        // presence alone (HasRSP) is a sufficient check.
         if (this->first.flit.req.Opcode() == Opcodes::REQ::WriteEvictOrEvict)
-        {
-            size_t index = this->subsequence.size() - 1;
-            for (auto iter = this->subsequence.rbegin(); iter != this->subsequence.rend(); iter++, index--)
-            {
-                if (this->subsequenceKeys[index].IsDenied())
-                    continue;
-
-                if (iter->IsRSP() && iter->IsFromHome(glbl) && iter->flit.rsp.Opcode() == Opcodes::RSP::CompDBIDResp)
-                    return true;
-
-                if (!iter->IsToHome(glbl))
-                    continue;
-
-                if (iter->IsRSP() && iter->flit.rsp.Opcode() == Opcodes::RSP::CompAck)
-                    return true;
-            }
-        }
+            return this->HasRSP({ Opcodes::RSP::CompAck });
         else
             return true;
-
-        return false;
 #else
         return true;
 #endif
@@ -407,9 +396,10 @@ namespace /*CHI::*/Xact {
             if (!rspFlit.IsFromRequesterToHome(glbl))
                 return this->ResponseFlitDenied(XactDenial::DENIED_RSP_NOT_FROM_RN_TO_HN, rspFlit);
 
-            if (this->HasRSP({ Opcodes::RSP::CompDBIDResp }))
-                return XactDenial::DENIED_COMPACK_AFTER_DBIDRESP;
-
+            // CompAck legitimately follows CompDBIDResp for this opcode (that IS
+            // the tracked completion shape) -- GetDBID() below is the correct
+            // gate: it is only set once CompDBIDResp has been recorded, so a
+            // CompAck arriving before it is still denied.
             auto optDBID = this->GetDBID();
 
             if (!optDBID)
