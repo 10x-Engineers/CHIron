@@ -361,7 +361,11 @@ namespace CHI {
 
         protected:
             virtual XactDenialEnum                  NextRetryAckNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& rspFlit) noexcept;
-        
+#ifdef CHI_ISSUE_EB_ENABLE
+            virtual XactDenialEnum                  NextCombinedWriteCMORSPNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& rspFlit) noexcept;
+            bool                                    IsCombinedWriteCMOComplete() const noexcept;
+#endif
+
             virtual XactDenialEnum                  ResendNoRecord(const Global<config>& glbl, FiredResponseFlit<config> pCrdFlit, std::shared_ptr<Xaction<config>> xaction) noexcept;
         
             virtual bool                            NextDataID(Flits::REQ<config>::ssize_t, const FiredResponseFlit<config>& datFlit, std::initializer_list<typename Flits::DAT<config>::opcode_t>) noexcept;
@@ -418,6 +422,54 @@ namespace CHI {
         template<FlitConfigurationConcept config>
         inline static std::bitset<4> GetDataIDCompleteMask(
             typename Flits::REQ<config>::ssize_t    reqSize) noexcept;
+
+#ifdef CHI_ISSUE_EB_ENABLE
+        // Combined Write requests -- CHI E.b Table 13-12 (p.13-421/422) encodings 0x50..0x66.
+        // Table 4-17 (p.4-182) lists the permitted write x CMO combinations; every one of them
+        // owes the CMO leg its own CompCMO (4.5.1 p.4-198), and the *CleanShPerSep PCMO
+        // variants additionally owe a Persist (4.2.4 p.4-182).
+        template<typename T>
+        inline constexpr bool IsCombinedWriteNonCopyBackOpcode(T opcode) noexcept
+        {
+            return opcode == Opcodes::REQ::WriteNoSnpFullCleanSh
+                || opcode == Opcodes::REQ::WriteNoSnpFullCleanInv
+                || opcode == Opcodes::REQ::WriteNoSnpFullCleanShPerSep
+                || opcode == Opcodes::REQ::WriteNoSnpPtlCleanSh
+                || opcode == Opcodes::REQ::WriteNoSnpPtlCleanInv
+                || opcode == Opcodes::REQ::WriteNoSnpPtlCleanShPerSep
+                || opcode == Opcodes::REQ::WriteUniqueFullCleanSh
+                || opcode == Opcodes::REQ::WriteUniqueFullCleanShPerSep
+                || opcode == Opcodes::REQ::WriteUniquePtlCleanSh
+                || opcode == Opcodes::REQ::WriteUniquePtlCleanShPerSep;
+        }
+
+        template<typename T>
+        inline constexpr bool IsCombinedWriteCopyBackOpcode(T opcode) noexcept
+        {
+            return opcode == Opcodes::REQ::WriteBackFullCleanSh
+                || opcode == Opcodes::REQ::WriteBackFullCleanInv
+                || opcode == Opcodes::REQ::WriteBackFullCleanShPerSep
+                || opcode == Opcodes::REQ::WriteCleanFullCleanSh
+                || opcode == Opcodes::REQ::WriteCleanFullCleanShPerSep;
+        }
+
+        template<typename T>
+        inline constexpr bool IsCombinedWriteOpcode(T opcode) noexcept
+        {
+            return IsCombinedWriteNonCopyBackOpcode(opcode) || IsCombinedWriteCopyBackOpcode(opcode);
+        }
+
+        template<typename T>
+        inline constexpr bool IsCombinedWritePersistOpcode(T opcode) noexcept
+        {
+            return opcode == Opcodes::REQ::WriteNoSnpFullCleanShPerSep
+                || opcode == Opcodes::REQ::WriteNoSnpPtlCleanShPerSep
+                || opcode == Opcodes::REQ::WriteUniqueFullCleanShPerSep
+                || opcode == Opcodes::REQ::WriteUniquePtlCleanShPerSep
+                || opcode == Opcodes::REQ::WriteBackFullCleanShPerSep
+                || opcode == Opcodes::REQ::WriteCleanFullCleanShPerSep;
+        }
+#endif
     }
 /*
 }
@@ -1732,6 +1784,101 @@ namespace /*CHI::*/Xact {
 
         return XactDenial::ACCEPTED;
     }
+
+#ifdef CHI_ISSUE_EB_ENABLE
+    // CHI E.b 4.5.1 (p.4-198, MUST): the CMO leg of a Combined Write has its own completion,
+    // CompCMO, which "can be combined with Persist response as CompPersist opcode". The
+    // *CleanShPerSep PCMO is treated as a CleanSharedPersistSep, so it additionally owes a
+    // Persist (4.2.4 p.4-182) -- either standalone or folded into the same CompPersist.
+    template<FlitConfigurationConcept config>
+    inline bool Xaction<config>::IsCombinedWriteCMOComplete() const noexcept
+    {
+        if (!details::IsCombinedWriteOpcode(this->first.flit.req.Opcode()))
+            return true;
+
+        bool gotCompPersist = this->HasRSP({ Opcodes::RSP::CompPersist });
+
+        if (!gotCompPersist && !this->HasRSP({ Opcodes::RSP::CompCMO }))
+            return false;
+
+        if (details::IsCombinedWritePersistOpcode(this->first.flit.req.Opcode()))
+            return gotCompPersist || this->HasRSP({ Opcodes::RSP::Persist });
+
+        return true;
+    }
+
+    // The CMO leg's completion of a Combined Write. CHI E.b 4.5.1 (p.4-198, MUST): CompCMO
+    // "must be used only in Combined Write transactions" and "can be combined with Persist
+    // response as CompPersist opcode"; the *CleanShPerSep PCMO also owes a Persist (4.2.4
+    // p.4-182). Table A-8 (p.A-488): CompCMO/CompPersist carry the REQ TxnID, Persist is
+    // matched by PGroupID and carries no TxnID.
+    template<FlitConfigurationConcept config>
+    inline XactDenialEnum Xaction<config>::NextCombinedWriteCMORSPNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& rspFlit) noexcept
+    {
+        if (!details::IsCombinedWriteOpcode(this->first.flit.req.Opcode()))
+            return this->ResponseFlitDenied(XactDenial::DENIED_COMPCMO_ON_NON_COMBINED_WRITE, rspFlit);
+
+        const bool isPersistOpcode = details::IsCombinedWritePersistOpcode(this->first.flit.req.Opcode());
+
+        if (rspFlit.flit.rsp.Opcode() == Opcodes::RSP::Persist
+         || rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompPersist)
+        {
+            if (!isPersistOpcode)
+                return this->ResponseFlitDenied(XactDenial::DENIED_RSP_OPCODE, rspFlit,
+                    "Persist response is only owed by a *CleanShPerSep Combined Write");
+
+            if (rspFlit.flit.rsp.PGroupID() != this->first.flit.req.PGroupID())
+                return XactDenial::DENIED_PGROUPID_MISMATCH;
+        }
+
+        if (rspFlit.flit.rsp.Opcode() == Opcodes::RSP::Persist)
+        {
+            if (!rspFlit.IsFromHomeToRequester(glbl) && !rspFlit.IsFromSubordinateToRequester(glbl))
+                return this->ResponseFlitDenied(XactDenial::DENIED_RSP_NOT_TO_RN, rspFlit);
+
+            if (this->HasRSP({ Opcodes::RSP::Persist }))
+                return XactDenial::DENIED_PERSIST_AFTER_PERSIST;
+
+            if (this->HasRSP({ Opcodes::RSP::CompPersist }))
+                return XactDenial::DENIED_PERSIST_AFTER_COMPPERSIST;
+        }
+        else
+        {
+            if (!rspFlit.IsFromHomeToRequester(glbl))
+                return this->ResponseFlitDenied(XactDenial::DENIED_RSP_NOT_FROM_HN_TO_RN, rspFlit);
+
+            if (this->HasRSP({ Opcodes::RSP::CompCMO }))
+                return rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompCMO
+                    ? XactDenial::DENIED_COMPCMO_AFTER_COMPCMO
+                    : XactDenial::DENIED_COMPPERSIST_AFTER_COMPCMO;
+
+            if (this->HasRSP({ Opcodes::RSP::CompPersist }))
+                return rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompCMO
+                    ? XactDenial::DENIED_COMPCMO_AFTER_COMPPERSIST
+                    : XactDenial::DENIED_COMPPERSIST_AFTER_COMPPERSIST;
+
+            if (rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompPersist
+             && this->HasRSP({ Opcodes::RSP::Persist }))
+                return XactDenial::DENIED_COMPPERSIST_AFTER_PERSIST;
+
+            if (rspFlit.flit.rsp.TxnID() != this->first.flit.req.TxnID())
+                return XactDenial::DENIED_RSP_TXNID_MISMATCHING_REQ;
+        }
+
+        if (rspFlit.flit.rsp.TgtID() != this->first.flit.req.SrcID())
+            return XactDenial::DENIED_RSP_TGTID_MISMATCHING_REQ;
+
+        //
+        if (glbl.CHECK_FIELD_MAPPING.enable)
+        {
+            XactDenialEnum denial = glbl.CHECK_FIELD_MAPPING.Check(rspFlit.flit.rsp);
+            if (denial != XactDenial::ACCEPTED)
+                return denial;
+        }
+
+        return XactDenial::ACCEPTED;
+    }
+#endif
 
     template<FlitConfigurationConcept config>
     inline XactDenialEnum Xaction<config>::ResendNoRecord(const Global<config>& glbl, FiredResponseFlit<config> pCrdFlit, std::shared_ptr<Xaction<config>> xaction) noexcept

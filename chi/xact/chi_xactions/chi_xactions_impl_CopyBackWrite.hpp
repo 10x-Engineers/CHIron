@@ -105,6 +105,10 @@ namespace /*CHI::*/Xact {
          && this->first.flit.req.Opcode() != Opcodes::REQ::WriteEvictFull
 #ifdef CHI_ISSUE_EB_ENABLE
          && this->first.flit.req.Opcode() != Opcodes::REQ::WriteEvictOrEvict
+         // CHI E.b 4.2.4 (p.4-183, MUST): "All permitted behaviors of the Combined Write
+         // request are the same as if the write and CMO are sent separately" -- the CopyBack
+         // forms run the CopyBack Write flow plus the CMO leg's completion.
+         && !details::IsCombinedWriteCopyBackOpcode(this->first.flit.req.Opcode())
 #endif
         ) [[unlikely]]
         {
@@ -224,7 +228,13 @@ namespace /*CHI::*/Xact {
     template<FlitConfigurationConcept config>
     inline bool XactionCopyBackWrite<config>::IsTxnIDComplete(const Global<config>& glbl) const noexcept
     {
+#ifdef CHI_ISSUE_EB_ENABLE
+        // The CMO leg's CompCMO/CompPersist carries the Requester's REQ TxnID (Table A-8
+        // p.A-488), so the TxnID stays allocated until that completion has been seen too.
+        return this->GotRetryAck() || IsResponseComplete(glbl) && this->IsCombinedWriteCMOComplete();
+#else
         return this->GotRetryAck() || IsResponseComplete(glbl);
+#endif
     }
 
     template<FlitConfigurationConcept config>
@@ -236,7 +246,11 @@ namespace /*CHI::*/Xact {
     template<FlitConfigurationConcept config>
     inline bool XactionCopyBackWrite<config>::IsComplete(const Global<config>& glbl) const noexcept
     {
+#ifdef CHI_ISSUE_EB_ENABLE
+        return this->GotRetryAck() || IsResponseComplete(glbl) && IsDataComplete(glbl) && IsAckComplete(glbl) && this->IsCombinedWriteCMOComplete();
+#else
         return this->GotRetryAck() || IsResponseComplete(glbl) && IsDataComplete(glbl) && IsAckComplete(glbl);
+#endif
     }
 
     template<FlitConfigurationConcept config>
@@ -417,6 +431,15 @@ namespace /*CHI::*/Xact {
             }
 
             return XactDenial::ACCEPTED;
+        }
+#endif
+
+#ifdef CHI_ISSUE_EB_ENABLE
+        if (rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompCMO
+         || rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompPersist
+         || rspFlit.flit.rsp.Opcode() == Opcodes::RSP::Persist)
+        {
+            return this->NextCombinedWriteCMORSPNoRecord(glbl, rspFlit);
         }
 #endif
 

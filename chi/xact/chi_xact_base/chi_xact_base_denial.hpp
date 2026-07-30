@@ -292,6 +292,13 @@ namespace CHI {
 
             inline constexpr XactDenialEnumBack DENIED_DWT_INOPERATIVENESS                          ("XACT_DENIED_DWT_INOPERATIVENESS",                         0x000B0000 | 100);
 
+            // CHI E.b 4.5.1 (p.4-198): CompCMO "must be used only in Combined Write transactions",
+            // is the CMO leg's own single completion, and may instead arrive combined as CompPersist.
+            inline constexpr XactDenialEnumBack DENIED_COMPCMO_ON_NON_COMBINED_WRITE                ("XACT_DENIED_COMPCMO_ON_NON_COMBINED_WRITE",               0x000B0000 | 101);
+            inline constexpr XactDenialEnumBack DENIED_COMPCMO_AFTER_COMPCMO                        ("XACT_DENIED_COMPCMO_AFTER_COMPCMO",                       0x000B0000 | 102);
+            inline constexpr XactDenialEnumBack DENIED_COMPCMO_AFTER_COMPPERSIST                    ("XACT_DENIED_COMPCMO_AFTER_COMPPERSIST",                   0x000B0000 | 103);
+            inline constexpr XactDenialEnumBack DENIED_COMPPERSIST_AFTER_COMPCMO                    ("XACT_DENIED_COMPPERSIST_AFTER_COMPCMO",                   0x000B0000 | 104);
+
             inline constexpr XactDenialEnumBack DENIED_RETRY_DIFF_XACT_TYPE         ("XACT_DENIED_RETRY_DIFF_XACT_TYPE",        0x000C0000 |  0);
             inline constexpr XactDenialEnumBack DENIED_RETRY_NO_ALLOWRETRY          ("XACT_DENIED_RETRY_NO_ALLOWRETRY",         0x000C0000 |  1);
             inline constexpr XactDenialEnumBack DENIED_NO_MATCHING_RETRY            ("XACT_DENIED_NO_MATCHING_RETRY",           0x000C0000 |  2);
