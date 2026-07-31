@@ -519,7 +519,9 @@ namespace CHI {
             inline constexpr SnoopFieldMappingBack SnpMakeInvalidStash              (Y , Y , Y , Y , Y , Y , I0, S , Y , Y , S , A1, I0, Y , Y );
             inline constexpr SnoopFieldMappingBack SnpStashUnique                   (Y , Y , Y , Y , Y , Y , I0, S , Y , Y , S , A1, I0, Y , Y );
             inline constexpr SnoopFieldMappingBack SnpStashShared                   (Y , Y , Y , Y , Y , Y , I0, S , Y , Y , S , A1, I0, Y , Y );
-            inline constexpr SnoopFieldMappingBack SnpQuery                         (Y , Y , Y , Y , Y , Y , I0, I0, I0, I0, I0, A1, I0, Y , D );
+            // ERRATA #2: DoNotGoToSD is I0, not Table A-10's A1 -- IHI0050E.b §13.10.34 (p.13-434):
+            // "Inapplicable, and must be set to zero in: SnpQuery, SnpDVMOp".
+            inline constexpr SnoopFieldMappingBack SnpQuery                         (Y , Y , Y , Y , Y , Y , I0, I0, I0, I0, I0, I0, I0, Y , D );
             inline constexpr SnoopFieldMappingBack SnpDVMOp                         (Y , Y , Y , Y , Y , I0, I0, S , S , S , Y , I0, I0, Y , I0);
         }
 

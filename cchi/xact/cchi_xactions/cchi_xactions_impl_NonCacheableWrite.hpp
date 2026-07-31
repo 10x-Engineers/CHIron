@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef __CCHI__CCHI_XACT_XACTIONS_IMPL__WRITEBACK
-#define __CCHI__CCHI_XACT_XACTIONS_IMPL__WRITEBACK
+#ifndef __CCHI__CCHI_XACT_XACTIONS_IMPL__NON_CACHEABLE_WRITE
+#define __CCHI__CCHI_XACT_XACTIONS_IMPL__NON_CACHEABLE_WRITE
 
 #include "../../spec/cchi_protocol_encoding.hpp"
 
@@ -11,20 +11,20 @@
 namespace CCHI::Xact {
 
     template<FlitConfigurationConcept config>
-    class XactionWriteBack : public Xaction<config> {
+    class XactionNonCacheableWrite : public Xaction<config> {
     public:
-        XactionWriteBack(const Global<config>&             glbl,
-                         const FiredRequestFlit<config>&   first) noexcept;
+        XactionNonCacheableWrite(const Global<config>&             glbl,
+                                 const FiredRequestFlit<config>&   first) noexcept;
 
     public:
         virtual std::shared_ptr<Xaction<config>>                Clone() const noexcept override;
-        std::shared_ptr<XactionWriteBack<config>>               CloneAsIs() const noexcept;
+        std::shared_ptr<XactionNonCacheableWrite<config>>       CloneAsIs() const noexcept;
 
     public:
         bool                GotDBIDResp() const noexcept;
         bool                GotComp() const noexcept;
-        bool                GotAnyCopyBackWrData() const noexcept;
-        bool                GotAllCopyBackWrData() const noexcept;
+        bool                GotAnyNonCopyBackWrData() const noexcept;
+        bool                GotAllNonCopyBackWrData() const noexcept;
 
     public:
         bool                IsResponseComplete(const Global<config>& glbl) const noexcept;
@@ -43,112 +43,111 @@ namespace CCHI::Xact {
 }
 
 
-// Implementation of: class XactionWriteBack
+// Implementation of: class XactionNonCacheableWrite
 namespace CCHI::Xact {
 
     template<FlitConfigurationConcept config>
-    inline XactionWriteBack<config>::XactionWriteBack(
+    inline XactionNonCacheableWrite<config>::XactionNonCacheableWrite(
         const Global<config>&               glbl,
         const FiredRequestFlit<config>&     first) noexcept
-        : Xaction<config>(XactionType::WriteBack, first)
+        : Xaction<config>(XactionType::NonCacheableWrite, first)
     {
         this->firstDenial = XactDenial::ACCEPTED;
     
-        if (!this->first.IsEVT()) [[unlikely]]
+        if (!this->first.IsREQ()) [[unlikely]]
         {
-            this->firstDenial = this->RequestFlitDenied(XactDenial::DENIED_CHANNEL_NOT_EVT, this->first);
+            this->firstDenial = this->RequestFlitDenied(XactDenial::DENIED_CHANNEL_NOT_REQ, this->first);
             return;
         }
 
         if (
-            this->first.flit.req.Opcode != Opcodes::EVT::WriteBackFull
+            this->first.flit.req.Opcode() != Opcodes::REQ::WriteNoSnpPtl
+         && this->first.flit.req.Opcode() != Opcodes::REQ::WriteNoSnpFull
         ) [[unlikely]]
         {
-            this->firstDenial = this->RequestFlitDenied(XactDenial::DENIED_EVT_OPCODE, this->first,
-                "This Opcode is not type of / supported by Write-Back transaction");
+            this->firstDenial = this->RequestFlitDenied(XactDenial::DENIED_REQ_OPCODE, this->first,
+                "This Opcode is not type of / supported by Non-Cacheable Write transaction");
             return;
         }
-
-        // TODO: Field Mapping Check
     }
 
     template<FlitConfigurationConcept config>
-    inline std::shared_ptr<Xaction<config>> XactionWriteBack<config>::Clone() const noexcept
+    inline std::shared_ptr<Xaction<config>> XactionNonCacheableWrite<config>::Clone() const noexcept
     {
-        return std::static_pointer_cast<Xaction<config>>(CloneAsIs());
+        return std::make_shared<XactionNonCacheableWrite<config>>(*this);
     }
 
     template<FlitConfigurationConcept config>
-    inline std::shared_ptr<XactionWriteBack<config>> XactionWriteBack<config>::CloneAsIs() const noexcept
+    inline std::shared_ptr<XactionNonCacheableWrite<config>> XactionNonCacheableWrite<config>::CloneAsIs() const noexcept
     {
-        return std::make_shared<XactionWriteBack<config>>(*this);
+        return std::make_shared<XactionNonCacheableWrite<config>>(*this);
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::GotDBIDResp() const noexcept
+    inline bool XactionNonCacheableWrite<config>::GotDBIDResp() const noexcept
     {
-        return this->HasDnRSP({ Opcodes::DnRSP::DBIDResp, Opcodes::DnRSP::CompDBIDResp });        
+        return this->HasDnRSP({ Opcodes::DnRSP::DBIDResp, Opcodes::DnRSP::CompDBIDResp });
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::GotComp() const noexcept
+    inline bool XactionNonCacheableWrite<config>::GotComp() const noexcept
     {
         return this->HasDnRSP({ Opcodes::DnRSP::Comp, Opcodes::DnRSP::CompDBIDResp });
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::GotAnyCopyBackWrData() const noexcept
+    inline bool XactionNonCacheableWrite<config>::GotAnyNonCopyBackWrData() const noexcept
     {
-        return this->HasUpDAT({ Opcodes::UpDAT::CopyBackWrData });
+        return this->HasDnDAT({ Opcodes::UpDAT::NonCopyBackWrData});
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::GotAllCopyBackWrData() const noexcept
+    inline bool XactionNonCacheableWrite<config>::GotAllNonCopyBackWrData() const noexcept
     {
         std::bitset<8> completeDataIDMask =
-            details::GetDataIDCompleteMask<config>(Sizes::B64);
+            details::GetDataIDCompleteMask<config>(this->first.flit.req.Size);
 
         std::bitset<8> collectedDataID =
             details::CollectUpDataID(this->first.flit.req.Size, this->subsequence,
-                [this](size_t i, const FiredResponseFlit<config>& flit) noexcept -> bool {
-                    return this->subsequenceKeys[i].IsAccepted() && flit.flit.updat.Opcode == Opcodes::UpDAT::CopyBackWrData;
+                [this](size_t i, const FiredResponseFlit<config>& flit) {
+                    return this->subsequenceKeys[i].IsAccepted() && flit.flit.updat.Opcode == Opcodes::UpDAT::NonCopyBackWrData;
             });
 
         return (completeDataIDMask & ~collectedDataID).none();
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::IsResponseComplete(const Global<config>& glbl) const noexcept
+    inline bool XactionNonCacheableWrite<config>::IsResponseComplete(const Global<config>& glbl) const noexcept
     {
-        return this->GotDBIDResp() && this->GotComp();
+        return GotDBIDResp() && GotComp();
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::IsDataComplete(const Global<config>& glbl) const noexcept
+    inline bool XactionNonCacheableWrite<config>::IsDataComplete(const Global<config>& glbl) const noexcept
     {
-        return this->GotAllCopyBackWrData();
+        return GotAllNonCopyBackWrData();
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::IsTxnIDComplete(const Global<config>& glbl) const noexcept
+    inline bool XactionNonCacheableWrite<config>::IsTxnIDComplete(const Global<config>& glbl) const noexcept
     {
         return IsResponseComplete(glbl);
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::IsDBIDComplete(const Global<config>& glbl) const noexcept
+    inline bool XactionNonCacheableWrite<config>::IsDBIDComplete(const Global<config>& glbl) const noexcept
     {
         return IsDataComplete(glbl);
     }
 
     template<FlitConfigurationConcept config>
-    inline bool XactionWriteBack<config>::IsComplete(const Global<config>& glbl) const noexcept
+    inline bool XactionNonCacheableWrite<config>::IsComplete(const Global<config>& glbl) const noexcept
     {
         return IsResponseComplete(glbl) && IsDataComplete(glbl);
     }
 
     template<FlitConfigurationConcept config>
-    inline XactDenialEnum XactionWriteBack<config>::NextDnRSPNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& dnrspFlit, bool& hasDBID, bool& firstDBID) noexcept
+    inline XactDenialEnum XactionNonCacheableWrite<config>::NextDnRSPNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& dnrspFlit, bool& hasDBID, bool& firstDBID) noexcept
     {
         if (this->IsComplete(glbl))
             return this->ResponseFlitDenied(XactDenial::DENIED_COMPLETED_DNRSP, dnrspFlit);
@@ -158,11 +157,11 @@ namespace CCHI::Xact {
 
         if (dnrspFlit.flit.dnrsp.Opcode == Opcodes::DnRSP::Comp)
         {
-            if (dnrspFlit.flit.dnrsp.TgtID != this->first.flit.evt.SrcID)
-                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TGTID_MISMATCHING_EVT, dnrspFlit, this->first);
+            if (dnrspFlit.flit.dnrsp.TgtID != this->first.flit.req.SrcID)
+                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TGTID_MISMATCHING_REQ, dnrspFlit, this->first);
 
-            if (dnrspFlit.flit.dnrsp.TxnID != this->first.flit.evt.TxnID)
-                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TXNID_MISMATCHING_EVT, dnrspFlit, this->first);
+            if (dnrspFlit.flit.dnrsp.TxnID != this->first.flit.req.TxnID)
+                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TXNID_MISMATCHING_REQ, dnrspFlit, this->first);
 
             if (this->HasDnRSP({ Opcodes::DnRSP::Comp }))
                 return this->ResponseFlitDenied(XactDenial::DENIED_COMP_AFTER_COMP, dnrspFlit, this->GetLastDnRSP({ Opcodes::DnRSP::Comp }));
@@ -176,11 +175,11 @@ namespace CCHI::Xact {
         }
         else if (dnrspFlit.flit.dnrsp.Opcode == Opcodes::DnRSP::DBIDResp)
         {
-            if (dnrspFlit.flit.dnrsp.TgtID != this->first.flit.evt.SrcID)
-                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TGTID_MISMATCHING_EVT, dnrspFlit, this->first);
+            if (dnrspFlit.flit.dnrsp.TgtID != this->first.flit.req.SrcID)
+                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TGTID_MISMATCHING_REQ, dnrspFlit, this->first);
 
-            if (dnrspFlit.flit.dnrsp.TxnID != this->first.flit.evt.TxnID)
-                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TXNID_MISMATCHING_EVT, dnrspFlit, this->first);
+            if (dnrspFlit.flit.dnrsp.TxnID != this->first.flit.req.TxnID)
+                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TXNID_MISMATCHING_REQ, dnrspFlit, this->first);
 
             if (this->HasDnRSP({ Opcodes::DnRSP::DBIDResp }))
                 return this->ResponseFlitDenied(XactDenial::DENIED_DBIDRESP_AFTER_DBIDRESP, dnrspFlit, this->GetLastDnRSP({ Opcodes::DnRSP::DBIDResp }));
@@ -197,11 +196,11 @@ namespace CCHI::Xact {
         }
         else if (dnrspFlit.flit.dnrsp.Opcode == Opcodes::DnRSP::CompDBIDResp)
         {
-            if (dnrspFlit.flit.dnrsp.TgtID != this->first.flit.evt.SrcID)
-                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TGTID_MISMATCHING_EVT, dnrspFlit, this->first);
+            if (dnrspFlit.flit.dnrsp.TgtID != this->first.flit.req.SrcID)
+                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TGTID_MISMATCHING_REQ, dnrspFlit, this->first);
 
-            if (dnrspFlit.flit.dnrsp.TxnID != this->first.flit.evt.TxnID)
-                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TXNID_MISMATCHING_EVT, dnrspFlit, this->first);
+            if (dnrspFlit.flit.dnrsp.TxnID != this->first.flit.req.TxnID)
+                return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_TXNID_MISMATCHING_REQ, dnrspFlit, this->first);
 
             if (this->HasDnRSP({ Opcodes::DnRSP::CompDBIDResp }))
                 return this->ResponseFlitDenied(XactDenial::DENIED_COMPDBIDRESP_AFTER_COMPDBIDRESP, dnrspFlit, this->GetLastDnRSP({ Opcodes::DnRSP::CompDBIDResp }));
@@ -221,25 +220,25 @@ namespace CCHI::Xact {
         }
 
         return this->ResponseFlitDenied(XactDenial::DENIED_DNRSP_OPCODE, dnrspFlit,
-            "This DnRSP Opcode is not expected for Write-Back transactions");
+            "This DnRSP Opcode is not type of / supported by Non-Cacheable Write transaction");
     }
 
     template<FlitConfigurationConcept config>
-    inline XactDenialEnum XactionWriteBack<config>::NextUpRSPNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& uprspFlit, bool& hasDBID, bool& firstDBID) noexcept
+    inline XactDenialEnum XactionNonCacheableWrite<config>::NextUpRSPNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& uprspFlit, bool& hasDBID, bool& firstDBID) noexcept
     {
         return this->ResponseFlitDenied(XactDenial::DENIED_CHANNEL_UPRSP, uprspFlit,
-            "Not expecting UpRSP flits for Write-Back transactions");
+            "Not expecting UpRSP flits for Non-Cacheable Write transactions");
     }
 
     template<FlitConfigurationConcept config>
-    inline XactDenialEnum XactionWriteBack<config>::NextDnDATNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& dndatFlit, bool& hasDBID, bool& firstDBID) noexcept
+    inline XactDenialEnum XactionNonCacheableWrite<config>::NextDnDATNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& dndatFlit, bool& hasDBID, bool& firstDBID) noexcept
     {
         return this->ResponseFlitDenied(XactDenial::DENIED_CHANNEL_DNDAT, dndatFlit,
-            "Not expecting DnDAT flits for Write-Back transactions");
+            "Not expecting DnDAT flits for Non-Cacheable Write transactions");
     }
 
     template<FlitConfigurationConcept config>
-    inline XactDenialEnum XactionWriteBack<config>::NextUpDATNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& updatFlit, bool& hasDBID, bool& firstDBID) noexcept
+    inline XactDenialEnum XactionNonCacheableWrite<config>::NextUpDATNoRecord(const Global<config>& glbl, const FiredResponseFlit<config>& updatFlit, bool& hasDBID, bool& firstDBID) noexcept
     {
         if (this->IsComplete(glbl))
             return this->ResponseFlitDenied(XactDenial::DENIED_COMPLETED_UPDAT, updatFlit);
@@ -247,9 +246,9 @@ namespace CCHI::Xact {
         if (!updatFlit.IsUpDAT()) [[unlikely]]
             return this->ResponseFlitDenied(XactDenial::DENIED_CHANNEL_NOT_UPDAT, updatFlit);
 
-        if (updatFlit.flit.updat.Opcode == Opcodes::UpDAT::CopyBackWrData)
+        if (updatFlit.flit.updat.Opcode == Opcodes::UpDAT::NonCopyBackWrData)
         {
-            const FiredResponseFlit<config>* optDBIDSource
+            const FiredResponseFlit<config>* optDBIDSource 
                 = this->GetLastDBIDSourceRSP({
                     Opcodes::DnRSP::DBIDResp,
                     Opcodes::DnRSP::CompDBIDResp });
@@ -257,13 +256,13 @@ namespace CCHI::Xact {
             if (!optDBIDSource)
                 return this->ResponseFlitDenied(XactDenial::DENIED_DATA_BEFORE_DBID, updatFlit);
 
-            if (updatFlit.flit.updat.TgtID() != optDBIDSource->flit.dnrsp.SrcID())
+            if (updatFlit.flit.updat.TgtID != optDBIDSource->flit.dnrsp.SrcID)
                 return this->ResponseFlitDenied(XactDenial::DENIED_UPDAT_TGTID_MISMATCHING_DNRSP, updatFlit, *optDBIDSource);
 
-            if (updatFlit.flit.updat.TxnID() != optDBIDSource->flit.dnrsp.DBID())
+            if (updatFlit.flit.updat.TxnID != optDBIDSource->flit.dnrsp.DBID)
                 return this->ResponseFlitDenied(XactDenial::DENIED_UPDAT_TXNID_MISMATCHING_DBID, updatFlit, *optDBIDSource);
 
-            if (!this->NextEVTDataID(updatFlit))
+            if (!this->NextREQDataID(updatFlit))
                 return this->ResponseFlitDenied(XactDenial::DENIED_UPDAT_DUPLICATED_DATAID, updatFlit);
 
             // TODO: Field Mapping Check
@@ -272,9 +271,9 @@ namespace CCHI::Xact {
         }
 
         return this->ResponseFlitDenied(XactDenial::DENIED_UPDAT_OPCODE, updatFlit,
-            "This UpDAT Opcode is not expected for Write-Back transactions");
+            "This UpDAT Opcode is not type of / supported by Non-Cacheable Write transaction");
     }
 }
 
 
-#endif // __CCHI__CCHI_XACT_XACTIONS_IMPL__WRITEBACK
+#endif // __CCHI__CCHI_XACT_XACTIONS_IMPL__NON_CACHEABLE_WRITE
