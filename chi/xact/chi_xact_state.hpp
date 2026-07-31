@@ -715,29 +715,32 @@ namespace /*CHI::*/Xact {
                                                                       // 0x4D
                                                                       // 0x4E
                                                                       // 0x4F
-    //  SET_REQ(                  WriteNoSnpFullCleanSh           );  // 0x50 // TODO: not listed in Issue E specification
-    //  SET_REQ(                  WriteNoSnpFullCleanInv          );  // 0x51 // TODO: not listed in Issue E specification
-    //  SET_REQ(                  WriteNoSnpFullCleanShPerSep     );  // 0x52 // TODO: not listed in Issue E specification
+        // Combined Write -- CHI E.b 4.2.4 (p.4-183, MUST): "All permitted behaviors of the
+        // Combined Write request are the same as if the write and CMO are sent separately",
+        // so the Requester's cache-state transition table is the base write opcode's.
+        SET_REQ_EX(WriteNonCopyBack, WriteNoSnpFullCleanSh       , WriteNoSnpFull );  // 0x50
+        SET_REQ_EX(WriteNonCopyBack, WriteNoSnpFullCleanInv      , WriteNoSnpFull );  // 0x51
+        SET_REQ_EX(WriteNonCopyBack, WriteNoSnpFullCleanShPerSep , WriteNoSnpFull );  // 0x52
                                                                       // 0x53
-    //  SET_REQ(                  WriteUniqueFullCleanSh          );  // 0x54 // TODO: not listed in Issue E specification
+        SET_REQ_EX(WriteNonCopyBack, WriteUniqueFullCleanSh      , WriteUniqueFull);  // 0x54
                                                                       // 0x55
-    //  SET_REQ(                  WriteUniqueFullCleanShPerSep    );  // 0x56 // TODO: not listed in Issue E specification
+        SET_REQ_EX(WriteNonCopyBack, WriteUniqueFullCleanShPerSep, WriteUniqueFull);  // 0x56
                                                                       // 0x57
-    //  SET_REQ(                  WriteBackFullCleanSh            );  // 0x58 // TODO: not listed in Issue E specification
-    //  SET_REQ(                  WriteBackFullCleanInv           );  // 0x59 // TODO: not listed in Issue E specification
-    //  SET_REQ(                  WriteBackFullCleanShPerSep      );  // 0x5A // TODO: not listed in Issue E specification
+        SET_REQ_EX(WriteCopyBack   , WriteBackFullCleanSh        , WriteBackFull  );  // 0x58
+        SET_REQ_EX(WriteCopyBack   , WriteBackFullCleanInv       , WriteBackFull  );  // 0x59
+        SET_REQ_EX(WriteCopyBack   , WriteBackFullCleanShPerSep  , WriteBackFull  );  // 0x5A
                                                                       // 0x5B
-    //  SET_REQ(                  WriteCleanFullCleanSh           );  // 0x5C // TODO: not listed in Issue E specification
+        SET_REQ_EX(WriteCopyBack   , WriteCleanFullCleanSh       , WriteCleanFull );  // 0x5C
                                                                       // 0x5D
-    //  SET_REQ(                  WriteCleanFullCleanShPerSep     );  // 0x5E // TODO: not listed in Issue E specification
+        SET_REQ_EX(WriteCopyBack   , WriteCleanFullCleanShPerSep , WriteCleanFull );  // 0x5E
                                                                       // 0x5F
-    //  SET_REQ(                  WriteNoSnpPtlCleanSh            );  // 0x60 // TODO: not listed in Issue E specification
-    //  SET_REQ(                  WriteNoSnpPtlCleanInv           );  // 0x61 // TODO: not listed in Issue E specification
-    //  SET_REQ(                  WriteNoSnpPtlCleanShPerSep      );  // 0x62 // TODO: not listed in Issue E specification
+        SET_REQ_EX(WriteNonCopyBack, WriteNoSnpPtlCleanSh        , WriteNoSnpPtl  );  // 0x60
+        SET_REQ_EX(WriteNonCopyBack, WriteNoSnpPtlCleanInv       , WriteNoSnpPtl  );  // 0x61
+        SET_REQ_EX(WriteNonCopyBack, WriteNoSnpPtlCleanShPerSep  , WriteNoSnpPtl  );  // 0x62
                                                                       // 0x63
-    //  SET_REQ(                  WriteUniquePtlCleanSh           );  // 0x64 // TODO: not listed in Issue E specification
+        SET_REQ_EX(WriteNonCopyBack, WriteUniquePtlCleanSh       , WriteUniquePtl );  // 0x64
                                                                       // 0x65
-    //  SET_REQ(                  WriteUniquePtlCleanShPerSep     );  // 0x66 // TODO: not listed in Issue E specification
+        SET_REQ_EX(WriteNonCopyBack, WriteUniquePtlCleanShPerSep , WriteUniquePtl );  // 0x66
                                                                       // 0x67
                                                                       // 0x68
                                                                       // 0x69

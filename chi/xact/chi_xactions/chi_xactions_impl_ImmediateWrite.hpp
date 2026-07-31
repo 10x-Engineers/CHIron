@@ -106,6 +106,12 @@ namespace /*CHI::*/Xact {
          && this->first.flit.req.Opcode() != Opcodes::REQ::WriteUniqueFull
          && this->first.flit.req.Opcode() != Opcodes::REQ::WriteUniquePtlStash
          && this->first.flit.req.Opcode() != Opcodes::REQ::WriteUniqueFullStash
+#ifdef CHI_ISSUE_EB_ENABLE
+         // CHI E.b 4.2.4 (p.4-183, MUST): "All permitted behaviors of the Combined Write
+         // request are the same as if the write and CMO are sent separately" -- the
+         // Non-CopyBack forms run the Immediate Write flow plus the CMO leg's completion.
+         && !details::IsCombinedWriteNonCopyBackOpcode(this->first.flit.req.Opcode())
+#endif
         ) [[unlikely]]
         {
             this->firstDenial = this->RequestFlitDenied(XactDenial::DENIED_REQ_OPCODE, this->first,
@@ -281,7 +287,13 @@ namespace /*CHI::*/Xact {
     template<FlitConfigurationConcept config>
     inline bool XactionImmediateWrite<config>::IsTxnIDComplete(const Global<config>& glbl) const noexcept
     {
+#ifdef CHI_ISSUE_EB_ENABLE
+        // The CMO leg's CompCMO/CompPersist carries the Requester's REQ TxnID (Table A-8
+        // p.A-488), so the TxnID stays allocated until that completion has been seen too.
+        return this->GotRetryAck() || IsResponseComplete(glbl) && this->IsCombinedWriteCMOComplete();
+#else
         return this->GotRetryAck() || IsResponseComplete(glbl);
+#endif
     }
 
     template<FlitConfigurationConcept config>
@@ -293,7 +305,11 @@ namespace /*CHI::*/Xact {
     template<FlitConfigurationConcept config>
     inline bool XactionImmediateWrite<config>::IsComplete(const Global<config>& glbl) const noexcept
     {
+#ifdef CHI_ISSUE_EB_ENABLE
+        return this->GotRetryAck() || IsResponseComplete(glbl) && IsDataComplete(glbl) && IsAckComplete(glbl) && IsTagOpComplete(glbl) && this->IsCombinedWriteCMOComplete();
+#else
         return this->GotRetryAck() || IsResponseComplete(glbl) && IsDataComplete(glbl) && IsAckComplete(glbl) && IsTagOpComplete(glbl);
+#endif
     }
 
     template<FlitConfigurationConcept config>
@@ -586,6 +602,15 @@ namespace /*CHI::*/Xact {
 
             return XactDenial::ACCEPTED;
         }
+
+#ifdef CHI_ISSUE_EB_ENABLE
+        else if (rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompCMO
+              || rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompPersist
+              || rspFlit.flit.rsp.Opcode() == Opcodes::RSP::Persist)
+        {
+            return this->NextCombinedWriteCMORSPNoRecord(glbl, rspFlit);
+        }
+#endif
 
         return this->ResponseFlitDenied(XactDenial::DENIED_RSP_OPCODE, rspFlit,
             "This RSP Opcode is not expected for Immediate Write transactions");

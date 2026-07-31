@@ -1407,29 +1407,29 @@ namespace /*CHI::*/Xact {
                                                                             // 0x4D
                                                                             // 0x4E
                                                                             // 0x4F
-        SET_REQ_XACTION(WriteNoSnpFullCleanSh       , None              );  // 0x50
-        SET_REQ_XACTION(WriteNoSnpFullCleanInv      , None              );  // 0x51
-        SET_REQ_XACTION(WriteNoSnpFullCleanShPerSep , None              );  // 0x52
+        SET_REQ_XACTION(WriteNoSnpFullCleanSh       , ImmediateWrite    );  // 0x50
+        SET_REQ_XACTION(WriteNoSnpFullCleanInv      , ImmediateWrite    );  // 0x51
+        SET_REQ_XACTION(WriteNoSnpFullCleanShPerSep , ImmediateWrite    );  // 0x52
                                                                             // 0x53
-        SET_REQ_XACTION(WriteUniqueFullCleanSh      , None              );  // 0x54
+        SET_REQ_XACTION(WriteUniqueFullCleanSh      , ImmediateWrite    );  // 0x54
                                                                             // 0x55
-        SET_REQ_XACTION(WriteUniqueFullCleanShPerSep, None              );  // 0x56
+        SET_REQ_XACTION(WriteUniqueFullCleanShPerSep, ImmediateWrite    );  // 0x56
                                                                             // 0x57
-        SET_REQ_XACTION(WriteBackFullCleanSh        , None              );  // 0x58
-        SET_REQ_XACTION(WriteBackFullCleanInv       , None              );  // 0x59
-        SET_REQ_XACTION(WriteBackFullCleanShPerSep  , None              );  // 0x5A
+        SET_REQ_XACTION(WriteBackFullCleanSh        , CopyBackWrite     );  // 0x58
+        SET_REQ_XACTION(WriteBackFullCleanInv       , CopyBackWrite     );  // 0x59
+        SET_REQ_XACTION(WriteBackFullCleanShPerSep  , CopyBackWrite     );  // 0x5A
                                                                             // 0x5B
-        SET_REQ_XACTION(WriteCleanFullCleanSh       , None              );  // 0x5C
+        SET_REQ_XACTION(WriteCleanFullCleanSh       , CopyBackWrite     );  // 0x5C
                                                                             // 0x5D
-        SET_REQ_XACTION(WriteCleanFullCleanShPerSep , None              );  // 0x5E
+        SET_REQ_XACTION(WriteCleanFullCleanShPerSep , CopyBackWrite     );  // 0x5E
                                                                             // 0x5F
-        SET_REQ_XACTION(WriteNoSnpPtlCleanSh        , None              );  // 0x60
-        SET_REQ_XACTION(WriteNoSnpPtlCleanInv       , None              );  // 0x61
-        SET_REQ_XACTION(WriteNoSnpPtlCleanShPerSep  , None              );  // 0x62
+        SET_REQ_XACTION(WriteNoSnpPtlCleanSh        , ImmediateWrite    );  // 0x60
+        SET_REQ_XACTION(WriteNoSnpPtlCleanInv       , ImmediateWrite    );  // 0x61
+        SET_REQ_XACTION(WriteNoSnpPtlCleanShPerSep  , ImmediateWrite    );  // 0x62
                                                                             // 0x63
-        SET_REQ_XACTION(WriteUniquePtlCleanSh       , None              );  // 0x64
+        SET_REQ_XACTION(WriteUniquePtlCleanSh       , ImmediateWrite    );  // 0x64
                                                                             // 0x65
-        SET_REQ_XACTION(WriteUniquePtlCleanShPerSep , None              );  // 0x66
+        SET_REQ_XACTION(WriteUniquePtlCleanShPerSep , ImmediateWrite    );  // 0x66
                                                                             // 0x67
                                                                             // 0x68
                                                                             // 0x69
@@ -2886,29 +2886,29 @@ namespace /*CHI::*/Xact {
                                                                                 // 0x4D
                                                                                 // 0x4E
                                                                                 // 0x4F
-            SET_REQ_XACTION(WriteNoSnpFullCleanSh       , None              );  // 0x50
-            SET_REQ_XACTION(WriteNoSnpFullCleanInv      , None              );  // 0x51
-            SET_REQ_XACTION(WriteNoSnpFullCleanShPerSep , None              );  // 0x52
+            SET_REQ_XACTION(WriteNoSnpFullCleanSh       , ImmediateWrite    );  // 0x50
+            SET_REQ_XACTION(WriteNoSnpFullCleanInv      , ImmediateWrite    );  // 0x51
+            SET_REQ_XACTION(WriteNoSnpFullCleanShPerSep , ImmediateWrite    );  // 0x52
                                                                                 // 0x53
-            SET_REQ_XACTION(WriteUniqueFullCleanSh      , None              );  // 0x54
+            SET_REQ_XACTION(WriteUniqueFullCleanSh      , ImmediateWrite    );  // 0x54
                                                                                 // 0x55
-            SET_REQ_XACTION(WriteUniqueFullCleanShPerSep, None              );  // 0x56
+            SET_REQ_XACTION(WriteUniqueFullCleanShPerSep, ImmediateWrite    );  // 0x56
                                                                                 // 0x57
-            SET_REQ_XACTION(WriteBackFullCleanSh        , None              );  // 0x58
-            SET_REQ_XACTION(WriteBackFullCleanInv       , None              );  // 0x59
-            SET_REQ_XACTION(WriteBackFullCleanShPerSep  , None              );  // 0x5A
+            SET_REQ_XACTION(WriteBackFullCleanSh        , CopyBackWrite     );  // 0x58
+            SET_REQ_XACTION(WriteBackFullCleanInv       , CopyBackWrite     );  // 0x59
+            SET_REQ_XACTION(WriteBackFullCleanShPerSep  , CopyBackWrite     );  // 0x5A
                                                                                 // 0x5B
-            SET_REQ_XACTION(WriteCleanFullCleanSh       , None              );  // 0x5C
+            SET_REQ_XACTION(WriteCleanFullCleanSh       , CopyBackWrite     );  // 0x5C
                                                                                 // 0x5D
-            SET_REQ_XACTION(WriteCleanFullCleanShPerSep , None              );  // 0x5E
+            SET_REQ_XACTION(WriteCleanFullCleanShPerSep , CopyBackWrite     );  // 0x5E
                                                                                 // 0x5F
-            SET_REQ_XACTION(WriteNoSnpPtlCleanSh        , None              );  // 0x60
-            SET_REQ_XACTION(WriteNoSnpPtlCleanInv       , None              );  // 0x61
-            SET_REQ_XACTION(WriteNoSnpPtlCleanShPerSep  , None              );  // 0x62
+            SET_REQ_XACTION(WriteNoSnpPtlCleanSh        , ImmediateWrite    );  // 0x60
+            SET_REQ_XACTION(WriteNoSnpPtlCleanInv       , ImmediateWrite    );  // 0x61
+            SET_REQ_XACTION(WriteNoSnpPtlCleanShPerSep  , ImmediateWrite    );  // 0x62
                                                                                 // 0x63
-            SET_REQ_XACTION(WriteUniquePtlCleanSh       , None              );  // 0x64
+            SET_REQ_XACTION(WriteUniquePtlCleanSh       , ImmediateWrite    );  // 0x64
                                                                                 // 0x65
-            SET_REQ_XACTION(WriteUniquePtlCleanShPerSep , None              );  // 0x66
+            SET_REQ_XACTION(WriteUniquePtlCleanShPerSep , ImmediateWrite    );  // 0x66
                                                                                 // 0x67
                                                                                 // 0x68
                                                                                 // 0x69
