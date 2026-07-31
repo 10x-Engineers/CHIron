@@ -2052,19 +2052,61 @@ namespace /*CHI::*/Xact {
 
         std::shared_ptr<Xaction<config>> xaction;
 
-        // RSPs to requester do not apply TxnID with DBID,
-        // but may pass new DBID to requester.
+        if (rspFlit.Opcode() == Opcodes::RSP::Persist)
+        {
+            // Table A-8 (p.A-488) / 2.6 step 4 (p.2-102, MUST): a standalone Persist's
+            // TxnID "is inapplicable and must be set to zero" -- it is matched to its
+            // request by PGroupID, so it has no TxnID to look up here. 2.6 step 1
+            // (p.2-101) lets a Requester reuse a PGroupID currently in use, so a group
+            // can owe several Persists; the oldest unanswered member takes this one.
+            for (const auto& txTransaction : txTransactions)
+            {
+                const auto& tx = txTransaction.second;
 
-        txreqid_t key;
-        key.value   = 0;
-        key.id.src  = rspFlit.TgtID();
-        key.id.txn  = rspFlit.TxnID();
+                if (!tx->GetFirst().IsREQ())
+                    continue;
 
-        auto xactionIter = txTransactions.find(key);
-        if (xactionIter == txTransactions.end())
-            return this->ResponseDeniedByJoint(XactDenial::DENIED_RSP_TXNID_NOT_EXIST, firedRspFlit);
+                // 13.10.7 (p.13-418): only these two request families carry a
+                // PGroupID at all, so only they can be owed a Persist -- every other
+                // outstanding request has PGroupID 0 and would otherwise alias onto
+                // persistence group 0.
+                if (tx->GetFirst().flit.req.Opcode() != Opcodes::REQ::CleanSharedPersistSep
+                 && !details::IsCombinedWritePersistOpcode(tx->GetFirst().flit.req.Opcode()))
+                    continue;
 
-        xaction = xactionIter->second;
+                if (tx->GetFirst().flit.req.SrcID() != rspFlit.TgtID())
+                    continue;
+
+                if (tx->GetFirst().flit.req.PGroupID() != rspFlit.PGroupID())
+                    continue;
+
+                if (tx->HasRSP({ Opcodes::RSP::Persist })
+                 || tx->HasRSP({ Opcodes::RSP::CompPersist }))
+                    continue;
+
+                if (!xaction || tx->GetFirst().time < xaction->GetFirst().time)
+                    xaction = tx;
+            }
+
+            if (!xaction)
+                return this->ResponseDeniedByJoint(XactDenial::DENIED_RSP_TXNID_NOT_EXIST, firedRspFlit);
+        }
+        else
+        {
+            // RSPs to requester do not apply TxnID with DBID,
+            // but may pass new DBID to requester.
+
+            txreqid_t key;
+            key.value   = 0;
+            key.id.src  = rspFlit.TgtID();
+            key.id.txn  = rspFlit.TxnID();
+
+            auto xactionIter = txTransactions.find(key);
+            if (xactionIter == txTransactions.end())
+                return this->ResponseDeniedByJoint(XactDenial::DENIED_RSP_TXNID_NOT_EXIST, firedRspFlit);
+
+            xaction = xactionIter->second;
+        }
 
         if (theXaction)
             *theXaction = xaction;
