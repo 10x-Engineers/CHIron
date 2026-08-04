@@ -1640,6 +1640,50 @@ namespace /*CHI::*/Xact {
         }
     }
 
+    // CHI E.b §2.11 (p.2-145): "The transaction that is resent must have the same
+    // field values as the original request, except when the field is inapplicable
+    // or is one of" QoS, TgtID, TxnID, ReturnTxnID, SLCRepHint, AllowRetry,
+    // PCrdType, TraceTag, RSVDC -- so a reissue is identified by the fields it may
+    // NOT change. TxnID is on that list, and (p.2-146) frees it for reuse as soon
+    // as the RetryAck is received, so it cannot identify the reissue on its own.
+    // Fields whose applicability is opcode-dependent (Excl, SnoopMe, LikelyShared,
+    // ReturnNID, StashNID) are left out: §2.11 exempts an inapplicable field, and
+    // requiring them here would reject a legal reissue rather than match it.
+    template<FlitConfigurationConcept config>
+    inline bool IsReissueOf(const Flits::REQ<config>& reissue,
+                            const Flits::REQ<config>& original) noexcept
+    {
+        return reissue.Opcode()     == original.Opcode()
+            && reissue.Addr()       == original.Addr()
+            && reissue.Size()       == original.Size()
+            && reissue.NS()         == original.NS()
+            && reissue.Order()      == original.Order()
+            && reissue.MemAttr()    == original.MemAttr()
+            && reissue.SnpAttr()    == original.SnpAttr()
+            && reissue.ExpCompAck() == original.ExpCompAck();
+    }
+
+    // Picks the retried transaction a reissue belongs to. An exact TxnID match
+    // wins when one exists (a Requester that keeps its TxnID is unambiguous);
+    // otherwise the first field-compatible entry, per IsReissueOf above.
+    template<FlitConfigurationConcept config, class XactionList>
+    inline typename XactionList::iterator FindRetriedXaction(
+        XactionList& xactionList, const Flits::REQ<config>& reqFlit) noexcept
+    {
+        auto match = xactionList.end();
+        for (auto it = xactionList.begin(); it != xactionList.end(); it++)
+        {
+            const auto& original = it->get()->GetFirst().flit.req;
+            if (!IsReissueOf<config>(reqFlit, original))
+                continue;
+            if (original.TxnID() == reqFlit.TxnID())
+                return it;
+            if (match == xactionList.end())
+                match = it;
+        }
+        return match;
+    }
+
     template<FlitConfigurationConcept config>
     inline bool RNFJoint<config>::HasInflight() const noexcept
     {
@@ -1678,9 +1722,8 @@ namespace /*CHI::*/Xact {
             if (txTransactions.contains(key))
                 return this->RequestDeniedByJoint(XactDenial::DENIED_REQ_TXNID_IN_USE, firedReqFlit, txTransactions[key]);
 
-            // iterate and compare retry transactions
-            // TODO: simplified retry mapping by TxnID, temporary workaround for KunminghuV2
-            //       specification retry mapping implementation here
+            // iterate and compare retry transactions (see IsReissueOf: §2.11's
+            // invariant field set, not TxnID, identifies the reissue)
             rnsrc_t rnKey;
             rnKey.value     = 0;
             rnKey.id.src    = reqFlit.SrcID();
@@ -1689,11 +1732,7 @@ namespace /*CHI::*/Xact {
             if (xactionList == txRetriedTransactions.end())
                 return this->RequestDeniedByJoint(XactDenial::DENIED_NO_MATCHING_RETRY, firedReqFlit);
 
-            auto xactionIter = xactionList->second.begin();
-
-            for (; xactionIter != xactionList->second.end(); xactionIter++)
-                if (reqFlit.TxnID() == xactionIter->get()->GetFirst().flit.req.TxnID())
-                    break;
+            auto xactionIter = FindRetriedXaction<config>(xactionList->second, reqFlit);
 
             if (xactionIter == xactionList->second.end())
                 return this->RequestDeniedByJoint(XactDenial::DENIED_NO_MATCHING_RETRY, firedReqFlit);
@@ -3149,9 +3188,8 @@ namespace /*CHI::*/Xact {
             if (rxTransactions.contains(key))
                 return this->RequestDeniedByJoint(XactDenial::DENIED_REQ_TXNID_IN_USE, firedReqFlit, rxTransactions[key]);
 
-            // iterate and compare retry transactions
-            // TODO: simplified retry mapping by TxnID, temporary workaround for KunminghuV2
-            //       specification retry mapping implementation here
+            // iterate and compare retry transactions (see IsReissueOf: §2.11's
+            // invariant field set, not TxnID, identifies the reissue)
             hnsrc_t hnKey;
             hnKey.value     = 0;
             hnKey.id.src    = reqFlit.SrcID();
@@ -3160,11 +3198,7 @@ namespace /*CHI::*/Xact {
             if (xactionList == rxRetriedTransactions.end())
                 return this->RequestDeniedByJoint(XactDenial::DENIED_NO_MATCHING_RETRY, firedReqFlit);
 
-            auto xactionIter = xactionList->second.begin();
-
-            for (; xactionIter != xactionList->second.end(); xactionIter++)
-                if (reqFlit.TxnID() == xactionIter->get()->GetFirst().flit.req.TxnID())
-                    break;
+            auto xactionIter = FindRetriedXaction<config>(xactionList->second, reqFlit);
 
             if (xactionIter == xactionList->second.end())
                 return this->RequestDeniedByJoint(XactDenial::DENIED_NO_MATCHING_RETRY, firedReqFlit);
