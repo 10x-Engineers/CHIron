@@ -503,7 +503,12 @@ namespace /*CHI::*/Xact::details {
             if (requestSize <= 128)
                 collectedDataID.set(0);
             else if (requestSize <= 256)
-                collectedDataID.set(dataID & 0x02);
+                // CHI E.b Table 13-40 (p.13-440): on a 128-bit bus consecutive
+                // beats step DataID by 1, so a 256-bit transfer's two beats are
+                // adjacent granules -- bit 0 of DataID is what separates them.
+                // Masking with 0x02 (the 256-bit bus's step) collapsed both onto
+                // one bit and denied the second beat as a duplicate.
+                collectedDataID.set(dataID & 0x01);
             else // 512
                 collectedDataID.set(dataID);
         }
@@ -581,8 +586,9 @@ namespace /*CHI::*/Xact::details {
             }
             else if (requestSize <= 256)
             {
+                // Two adjacent granules on this bus -- see CollectDataID above.
                 collectedDataID.set(0);
-                collectedDataID.set(2);
+                collectedDataID.set(1);
             }
             else // 512
             {
