@@ -163,10 +163,33 @@ namespace /*CHI::*/Xact {
     template<FlitConfigurationConcept config>
     inline bool XactionAtomic<config>::IsRNDataComplete(const Global<config>& glbl) const noexcept
     {
-        if (this->HasDAT({ Opcodes::DAT::NonCopyBackWrData }))
-            return true;
+        // LOCAL PATCH (amba-chi-vip, 2026-08-18): an Atomic's operand is not always
+        // one data packet. CHI E.b Table 2-16 (Sec 2.10.5 p.2-137) permits
+        // AtomicCompare Size=32, and Sec 2.10.4 (p.2-136) then splits it across two
+        // packets on a 128-bit bus. The original `first NonCopyBackWrData completes
+        // it` retired the transaction after packet 0, so packet 1 was denied
+        // DENIED_DAT_TXNID_NOT_EXIST (rc=59). Accumulate DataIDs against the Size
+        // mask, exactly as XactionImmediateWrite::IsDataComplete does.
+        std::bitset<4> completeDataIDMask =
+            details::GetDataIDCompleteMask<config>(this->first.flit.req.Size());
 
-        return false;
+        std::bitset<4> collectedDataID;
+
+        size_t index = 0;
+        for (auto iter = this->subsequence.begin(); iter != this->subsequence.end(); iter++, index++)
+        {
+            if (this->subsequenceKeys[index].IsDenied())
+                continue;
+
+            if (!iter->IsFromRequester(glbl) || !iter->IsDAT())
+                continue;
+
+            if (iter->flit.dat.Opcode() == Opcodes::DAT::NonCopyBackWrData)
+                collectedDataID |= details::CollectDataID<config>(
+                    this->first.flit.req.Size(), iter->flit.dat.DataID());
+        }
+
+        return (completeDataIDMask & ~collectedDataID).none();
     }
 
     template<FlitConfigurationConcept config>
@@ -504,7 +527,12 @@ namespace /*CHI::*/Xact {
             if (datFlit.flit.dat.TxnID() != optDBIDSource->flit.rsp.DBID())
                 return XactDenial::DENIED_DAT_TXNID_MISMATCHING_DBID;
 
-            if (this->HasDAT({ Opcodes::DAT::NonCopyBackWrData }))
+            // LOCAL PATCH (amba-chi-vip, 2026-08-18): a repeated DataID is the
+            // duplicate, not a second packet -- see IsRNDataComplete above. The
+            // opcode filter is required here (unlike XactionImmediateWrite, which
+            // has no inbound data): an Atomic's own CompData shares the DataID
+            // space and would otherwise read as a duplicate.
+            if (!this->NextREQDataID(datFlit, { Opcodes::DAT::NonCopyBackWrData }))
                 return XactDenial::DENIED_NCBWRDATA_AFTER_NCBWRDATA;
 
             //
