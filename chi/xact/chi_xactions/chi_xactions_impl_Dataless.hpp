@@ -240,7 +240,16 @@ namespace /*CHI::*/Xact {
     template<FlitConfigurationConcept config>
     inline bool XactionDataless<config>::IsTxnIDComplete(const Global<config>& glbl) const noexcept
     {
+#ifdef CHI_ISSUE_EB_ENABLE
+        // CHI E.b §2.6.2 step 1/2 (p.2-101): "The TxnID value can be reused by the
+        // Requester after receiving the Comp response" -- and by the Home likewise.
+        // §2.11's (p.2-146) outstanding-response list names CompPersist but not the
+        // standalone Persist, which Table A-8 (p.A-488) gives TxnID=0 and keys on
+        // PGroupID, so a reused TxnID cannot alias it. IsComplete() still waits.
+        return this->GotRetryAck() || IsCompResponseComplete(glbl);
+#else
         return this->GotRetryAck() || IsCompResponseComplete(glbl) && IsPersistResponseComplete(glbl);
+#endif
     }
 
     template<FlitConfigurationConcept config>
