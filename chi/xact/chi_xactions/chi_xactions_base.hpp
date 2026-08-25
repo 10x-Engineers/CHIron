@@ -459,6 +459,16 @@ namespace CHI {
             return IsCombinedWriteNonCopyBackOpcode(opcode) || IsCombinedWriteCopyBackOpcode(opcode);
         }
 
+        // Table 4-38 (4.7.2 p.4-218): the two Dataless requests completed by
+        // "Comp + StashDone or CompStashDone", i.e. the only ones ever owed a
+        // separate StashDone.
+        template<typename T>
+        inline constexpr bool IsStashOnceSepOpcode(T opcode) noexcept
+        {
+            return opcode == Opcodes::REQ::StashOnceSepShared
+                || opcode == Opcodes::REQ::StashOnceSepUnique;
+        }
+
         template<typename T>
         inline constexpr bool IsCombinedWritePersistOpcode(T opcode) noexcept
         {

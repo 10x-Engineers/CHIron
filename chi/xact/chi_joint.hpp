@@ -448,6 +448,14 @@ namespace CHI {
             // alone, which needs no key of its own -- a list the matcher scans.
             std::list<std::shared_ptr<Xaction<config>>>                           txPersistPendingTransactions;
 
+            // The StashDone twin of the list above. CHI E.b 2.6.2 (p.2-101, MUST) makes a
+            // separate StashDone's TxnID "inapplicable and must be set to zero", and Table
+            // 4-38 (4.7.2 p.4-218) gives StashOnceSep* "Comp + StashDone or CompStashDone"
+            // -- so on the split shape the request gives up its TxnID on Comp while the
+            // StashDone is still owed, exactly as a *PersistSep does. Keyed on
+            // StashGroupID, which 13.10.12 (p.13-419) carries in the DBID bits.
+            std::list<std::shared_ptr<Xaction<config>>>                           txStashDonePendingTransactions;
+
             std::unordered_map<uint64_t, std::list<FiredResponseFlit<config>>>    grantedPCredits[1 << Flits::RSP<config>::PCRDTYPE_WIDTH];
 
             Opcodes::REQ::Decoder<Flits::REQ<config>, GetXaction>                 reqDecoder;
@@ -1513,6 +1521,7 @@ namespace /*CHI::*/Xact {
         , txDBIDOverlappableTransactions    (obj.txDBIDOverlappableTransactions)
         , txRetriedTransactions             (obj.txRetriedTransactions)
         , txPersistPendingTransactions      (obj.txPersistPendingTransactions)
+        , txStashDonePendingTransactions    (obj.txStashDonePendingTransactions)
         , grantedPCredits                   (/*obj.grantedPCredits*/)
         , reqDecoder                        (obj.reqDecoder)
         , snpDecoder                        (obj.snpDecoder)
@@ -1535,6 +1544,7 @@ namespace /*CHI::*/Xact {
         txDBIDOverlappableTransactions  = obj.txDBIDOverlappableTransactions;
         txRetriedTransactions           = obj.txRetriedTransactions;
         txPersistPendingTransactions    = obj.txPersistPendingTransactions;
+        txStashDonePendingTransactions  = obj.txStashDonePendingTransactions;
     //  grantedPCredits                 = obj.grantedPCredits;
         reqDecoder                      = obj.reqDecoder;
         snpDecoder                      = obj.snpDecoder;
@@ -1587,6 +1597,9 @@ namespace /*CHI::*/Xact {
 
         for (auto& p : txPersistPendingTransactions)
             p = forkXaction(p);
+
+        for (auto& p : txStashDonePendingTransactions)
+            p = forkXaction(p);
     }
 
     template<FlitConfigurationConcept config>
@@ -1602,6 +1615,8 @@ namespace /*CHI::*/Xact {
         txRetriedTransactions.clear();
 
         txPersistPendingTransactions.clear();
+
+        txStashDonePendingTransactions.clear();
 
         for (int i = 0; i < (1 << Flits::RSP<config>::PCRDTYPE_WIDTH); i++)
             grantedPCredits[i].clear();
@@ -1628,6 +1643,9 @@ namespace /*CHI::*/Xact {
 
         for (auto& txPersistPending : txPersistPendingTransactions)
             dstVector.push_back(txPersistPending);
+
+        for (auto& txStashDonePending : txStashDonePendingTransactions)
+            dstVector.push_back(txStashDonePending);
 
         for (auto& txDBIDTransaction : txDBIDTransactions)
         {
@@ -1705,7 +1723,8 @@ namespace /*CHI::*/Xact {
     {
         return !rxTransactions.empty() || !txTransactions.empty()
             || !txDBIDTransactions.empty() || !txDBIDOverlappableTransactions.empty()
-            || !txRetriedTransactions.empty() || !txPersistPendingTransactions.empty();
+            || !txRetriedTransactions.empty() || !txPersistPendingTransactions.empty()
+            || !txStashDonePendingTransactions.empty();
     }
 
     template<FlitConfigurationConcept config>
@@ -2152,6 +2171,45 @@ namespace /*CHI::*/Xact {
             if (!xaction)
                 return this->ResponseDeniedByJoint(XactDenial::DENIED_RSP_TXNID_NOT_EXIST, firedRspFlit);
         }
+        else if (rspFlit.Opcode() == Opcodes::RSP::StashDone)
+        {
+            // The StashDone twin of the Persist matcher above. 2.6.2 (p.2-101, MUST):
+            // a separate StashDone's TxnID "is inapplicable and must be set to zero";
+            // 7.3 (p.7-297) has the Requester count outstanding StashDone responses per
+            // StashGroupID, so the oldest unanswered member of the group takes this one.
+            std::vector<std::shared_ptr<Xaction<config>>> stashDoneCandidates;
+            for (const auto& txTransaction : txTransactions)
+                stashDoneCandidates.push_back(txTransaction.second);
+            for (const auto& txStashDonePending : txStashDonePendingTransactions)
+                stashDoneCandidates.push_back(txStashDonePending);
+
+            for (const auto& tx : stashDoneCandidates)
+            {
+                if (!tx->GetFirst().IsREQ())
+                    continue;
+
+                // Table 4-38 (4.7.2 p.4-218): only these two are ever owed a separate
+                // StashDone, so only they can carry a StashGroupID that means one.
+                if (!details::IsStashOnceSepOpcode(tx->GetFirst().flit.req.Opcode()))
+                    continue;
+
+                if (tx->GetFirst().flit.req.SrcID() != rspFlit.TgtID())
+                    continue;
+
+                if (tx->GetFirst().flit.req.StashGroupID() != rspFlit.StashGroupID())
+                    continue;
+
+                if (tx->HasRSP({ Opcodes::RSP::StashDone })
+                 || tx->HasRSP({ Opcodes::RSP::CompStashDone }))
+                    continue;
+
+                if (!xaction || tx->GetFirst().time < xaction->GetFirst().time)
+                    xaction = tx;
+            }
+
+            if (!xaction)
+                return this->ResponseDeniedByJoint(XactDenial::DENIED_RSP_TXNID_NOT_EXIST, firedRspFlit);
+        }
         else
         {
             // RSPs to requester do not apply TxnID with DBID,
@@ -2227,6 +2285,14 @@ namespace /*CHI::*/Xact {
                  && !xaction->HasRSP({ Opcodes::RSP::CompPersist }))
                     txPersistPendingTransactions.push_back(xaction);
 
+                // Table 4-38 (4.7.2 p.4-218)'s split shape does the same to a
+                // StashOnceSep*: the Comp frees the TxnID while the StashDone is owed.
+                if (!xaction->IsComplete(glbl)
+                 && details::IsStashOnceSepOpcode(xaction->GetFirst().flit.req.Opcode())
+                 && !xaction->HasRSP({ Opcodes::RSP::StashDone })
+                 && !xaction->HasRSP({ Opcodes::RSP::CompStashDone }))
+                    txStashDonePendingTransactions.push_back(xaction);
+
                 // remove related TxnID mapping
                 txreqid_t key;
                 key.value   = 0;
@@ -2240,6 +2306,10 @@ namespace /*CHI::*/Xact {
             if (xaction->HasRSP({ Opcodes::RSP::Persist })
              || xaction->HasRSP({ Opcodes::RSP::CompPersist }))
                 txPersistPendingTransactions.remove(xaction);
+
+            if (xaction->HasRSP({ Opcodes::RSP::StashDone })
+             || xaction->HasRSP({ Opcodes::RSP::CompStashDone }))
+                txStashDonePendingTransactions.remove(xaction);
 
             // on DBID free
             if (xaction->IsDBIDComplete(glbl))
