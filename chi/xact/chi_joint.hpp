@@ -2293,13 +2293,20 @@ namespace /*CHI::*/Xact {
                  && !xaction->HasRSP({ Opcodes::RSP::CompStashDone }))
                     txStashDonePendingTransactions.push_back(xaction);
 
-                // remove related TxnID mapping
+                // remove related TxnID mapping -- but only while it is still THIS
+                // xaction's. A parked group-keyed obligation (Persist, StashDone) is
+                // resolved by a response that carries no TxnID, and 2.6.2 step 1
+                // (p.2-101) has already let the Requester reuse the one its request
+                // held; erasing by that stale key would drop whichever transaction
+                // now owns it.
                 txreqid_t key;
                 key.value   = 0;
                 key.id.src  = xaction->GetFirst().flit.req.SrcID();
                 key.id.txn  = xaction->GetFirst().flit.req.TxnID();
 
-                txTransactions.erase(key);
+                auto owner = txTransactions.find(key);
+                if (owner != txTransactions.end() && owner->second == xaction)
+                    txTransactions.erase(owner);
             }
 
             // The parked obligation is discharged by the Persist that answers it.
