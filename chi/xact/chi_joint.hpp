@@ -442,6 +442,12 @@ namespace CHI {
             std::unordered_map<uint64_t, std::list<std::shared_ptr<Xaction<config>>>>
                                                                                   txRetriedTransactions;
 
+            // CHI E.b 2.6.2 step 1 (p.2-101): a *PersistSep request gives up its TxnID
+            // on Comp while its standalone Persist is still owed, so the TxnID map can
+            // no longer hold it. Table A-8 (p.A-488) keys that Persist on PGroupID
+            // alone, which needs no key of its own -- a list the matcher scans.
+            std::list<std::shared_ptr<Xaction<config>>>                           txPersistPendingTransactions;
+
             std::unordered_map<uint64_t, std::list<FiredResponseFlit<config>>>    grantedPCredits[1 << Flits::RSP<config>::PCRDTYPE_WIDTH];
 
             Opcodes::REQ::Decoder<Flits::REQ<config>, GetXaction>                 reqDecoder;
@@ -1506,6 +1512,7 @@ namespace /*CHI::*/Xact {
         , txDBIDTransactions                (obj.txDBIDTransactions)
         , txDBIDOverlappableTransactions    (obj.txDBIDOverlappableTransactions)
         , txRetriedTransactions             (obj.txRetriedTransactions)
+        , txPersistPendingTransactions      (obj.txPersistPendingTransactions)
         , grantedPCredits                   (/*obj.grantedPCredits*/)
         , reqDecoder                        (obj.reqDecoder)
         , snpDecoder                        (obj.snpDecoder)
@@ -1527,6 +1534,7 @@ namespace /*CHI::*/Xact {
         txDBIDTransactions              = obj.txDBIDTransactions;
         txDBIDOverlappableTransactions  = obj.txDBIDOverlappableTransactions;
         txRetriedTransactions           = obj.txRetriedTransactions;
+        txPersistPendingTransactions    = obj.txPersistPendingTransactions;
     //  grantedPCredits                 = obj.grantedPCredits;
         reqDecoder                      = obj.reqDecoder;
         snpDecoder                      = obj.snpDecoder;
@@ -1576,6 +1584,9 @@ namespace /*CHI::*/Xact {
         for (auto& p : txRetriedTransactions)
             for (auto& p1 : p.second)
                 p1 = forkXaction(p1);
+
+        for (auto& p : txPersistPendingTransactions)
+            p = forkXaction(p);
     }
 
     template<FlitConfigurationConcept config>
@@ -1589,6 +1600,8 @@ namespace /*CHI::*/Xact {
         txDBIDOverlappableTransactions.clear();
 
         txRetriedTransactions.clear();
+
+        txPersistPendingTransactions.clear();
 
         for (int i = 0; i < (1 << Flits::RSP<config>::PCRDTYPE_WIDTH); i++)
             grantedPCredits[i].clear();
@@ -1612,6 +1625,9 @@ namespace /*CHI::*/Xact {
 
         for (auto& txTransaction : txTransactions)
             dstVector.push_back(txTransaction.second);
+
+        for (auto& txPersistPending : txPersistPendingTransactions)
+            dstVector.push_back(txPersistPending);
 
         for (auto& txDBIDTransaction : txDBIDTransactions)
         {
@@ -1689,7 +1705,7 @@ namespace /*CHI::*/Xact {
     {
         return !rxTransactions.empty() || !txTransactions.empty()
             || !txDBIDTransactions.empty() || !txDBIDOverlappableTransactions.empty()
-            || !txRetriedTransactions.empty();
+            || !txRetriedTransactions.empty() || !txPersistPendingTransactions.empty();
     }
 
     template<FlitConfigurationConcept config>
@@ -2098,10 +2114,16 @@ namespace /*CHI::*/Xact {
             // request by PGroupID, so it has no TxnID to look up here. 2.6 step 1
             // (p.2-101) lets a Requester reuse a PGroupID currently in use, so a group
             // can owe several Persists; the oldest unanswered member takes this one.
+            // A candidate is either still holding its TxnID (the Persist beat the
+            // Comp) or has already given it up on Comp and moved to the pending list.
+            std::vector<std::shared_ptr<Xaction<config>>> persistCandidates;
             for (const auto& txTransaction : txTransactions)
-            {
-                const auto& tx = txTransaction.second;
+                persistCandidates.push_back(txTransaction.second);
+            for (const auto& txPersistPending : txPersistPendingTransactions)
+                persistCandidates.push_back(txPersistPending);
 
+            for (const auto& tx : persistCandidates)
+            {
                 if (!tx->GetFirst().IsREQ())
                     continue;
 
@@ -2195,6 +2217,16 @@ namespace /*CHI::*/Xact {
                 // event on TxnID free
                 this->FireXactionTxnIDFree(xaction);
 
+                // A *PersistSep request that is still owed its standalone Persist
+                // outlives its TxnID (2.6.2 step 1 p.2-101), so keep it where the
+                // PGroupID matcher above can still find it.
+                if (!xaction->IsComplete(glbl)
+                 && (xaction->GetFirst().flit.req.Opcode() == Opcodes::REQ::CleanSharedPersistSep
+                  || details::IsCombinedWritePersistOpcode(xaction->GetFirst().flit.req.Opcode()))
+                 && !xaction->HasRSP({ Opcodes::RSP::Persist })
+                 && !xaction->HasRSP({ Opcodes::RSP::CompPersist }))
+                    txPersistPendingTransactions.push_back(xaction);
+
                 // remove related TxnID mapping
                 txreqid_t key;
                 key.value   = 0;
@@ -2203,6 +2235,11 @@ namespace /*CHI::*/Xact {
 
                 txTransactions.erase(key);
             }
+
+            // The parked obligation is discharged by the Persist that answers it.
+            if (xaction->HasRSP({ Opcodes::RSP::Persist })
+             || xaction->HasRSP({ Opcodes::RSP::CompPersist }))
+                txPersistPendingTransactions.remove(xaction);
 
             // on DBID free
             if (xaction->IsDBIDComplete(glbl))
