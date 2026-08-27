@@ -172,7 +172,12 @@ namespace /*CHI::*/Xact {
     template<FlitConfigurationConcept config>
     inline bool XactionIndependentStash<config>::IsTxnIDComplete(const Global<config>& glbl) const noexcept
     {
-        return IsComplete(glbl);
+        // 2.6.2 step 1 (p.2-101): "The TxnID value can be reused by the Requester after
+        // receiving the Comp response". On Table 4-38's (4.7.2 p.4-218) split shape the
+        // StashDone is still owed then, but its TxnID is zero (Table A-8 p.A-488) and it
+        // is matched by StashGroupID, so a reused TxnID cannot alias it. IsComplete()
+        // still waits for the StashDone; the joint parks the entry meanwhile.
+        return this->GotRetryAck() || IsCompResponseComplete(glbl);
     }
 
     template<FlitConfigurationConcept config>
@@ -320,11 +325,16 @@ namespace /*CHI::*/Xact {
                 if (rspFlit.flit.rsp.TgtID() != this->first.flit.req.SrcID())
                     return XactDenial::DENIED_RSP_TGTID_MISMATCHING_REQ;
 
-                if (rspFlit.flit.rsp.TxnID() != this->first.flit.req.TxnID())
-                    return XactDenial::DENIED_RSP_TXNID_MISMATCHING_REQ;
-
                 if (rspFlit.flit.rsp.Opcode() == Opcodes::RSP::StashDone)
                 {
+                    // 2.6.2 (p.2-101, MUST) / Table A-8 (p.A-488): a separate StashDone's
+                    // TxnID "is inapplicable and must be set to zero", so it is matched to
+                    // its request by StashGroupID -- exactly as a standalone Persist is
+                    // matched by PGroupID. Checking it against the REQ TxnID would deny
+                    // every conformant StashDone.
+                    if (rspFlit.flit.rsp.StashGroupID() != this->first.flit.req.StashGroupID())
+                        return XactDenial::DENIED_PGROUPID_MISMATCH;
+
                     if (this->HasRSP({ Opcodes::RSP::StashDone }))
                         return XactDenial::DENIED_STASHDONE_AFTER_STASHDONE;
 
@@ -333,6 +343,10 @@ namespace /*CHI::*/Xact {
                 }
                 else if (rspFlit.flit.rsp.Opcode() == Opcodes::RSP::CompStashDone)
                 {
+                    // Table A-8 (p.A-488) gives the combined form the REQ's own TxnID.
+                    if (rspFlit.flit.rsp.TxnID() != this->first.flit.req.TxnID())
+                        return XactDenial::DENIED_RSP_TXNID_MISMATCHING_REQ;
+
                     if (this->HasRSP({ Opcodes::RSP::Comp }))
                         return XactDenial::DENIED_COMPSTASHDONE_AFTER_COMP;
 
