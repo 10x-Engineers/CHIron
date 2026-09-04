@@ -208,16 +208,15 @@ namespace /*CHI::*/Xact {
     inline bool XactionCopyBackWrite<config>::IsAckComplete(const Global<config>& glbl) const noexcept
     {
 #ifdef CHI_ISSUE_EB_ENABLE
-        // WriteEvictOrEvict only: ack-complete requires the Requester to have
-        // actually SENT CompAck (Table 2-8 MUST, ExpCompAck=1 for this opcode) --
-        // CompDBIDResp is the Home's completion response and is already what
-        // IsResponseComplete()/IsDataComplete() key off of; it must not also
-        // satisfy the ack leg, or the transaction retires before the CompAck it
-        // is still waiting for ever arrives. CompAck can only ever be recorded
-        // Requester->Home (NextRSPNoRecord denies any other direction), so
-        // presence alone (HasRSP) is a sufficient check.
+        // WriteEvictOrEvict only. CHI E.b Sec 2.3.2 (p.2-55): the CompDBIDResp
+        // alternative is closed by the CopyBackWrData, and Sec 2.8.3 (p.2-116,
+        // MUST) owes the CompAck only "when the Completer sends a Comp instead
+        // of a CompDBIDResp". CompAck can only ever be recorded Requester->Home
+        // (NextRSPNoRecord denies any other direction), so presence alone
+        // (HasRSP) is a sufficient check on that alternative.
         if (this->first.flit.req.Opcode() == Opcodes::REQ::WriteEvictOrEvict)
-            return this->HasRSP({ Opcodes::RSP::CompAck });
+            return this->HasRSP({ Opcodes::RSP::CompDBIDResp })
+                || this->HasRSP({ Opcodes::RSP::CompAck });
         else
             return true;
 #else
@@ -410,10 +409,13 @@ namespace /*CHI::*/Xact {
             if (!rspFlit.IsFromRequesterToHome(glbl))
                 return this->ResponseFlitDenied(XactDenial::DENIED_RSP_NOT_FROM_RN_TO_HN, rspFlit);
 
-            // CompAck legitimately follows CompDBIDResp for this opcode (that IS
-            // the tracked completion shape) -- GetDBID() below is the correct
-            // gate: it is only set once CompDBIDResp has been recorded, so a
-            // CompAck arriving before it is still denied.
+            // CHI E.b Sec 2.3.2 (p.2-55) / Sec 2.8.3 (p.2-116, MUST): the CompAck
+            // belongs to the Comp alternative alone; the CompDBIDResp one is
+            // closed by the CopyBackWrData.
+            if (this->HasRSP({ Opcodes::RSP::CompDBIDResp }))
+                return this->ResponseFlitDenied(XactDenial::DENIED_RSP_OPCODE, rspFlit,
+                    "CompAck follows only the Comp alternative of WriteEvictOrEvict");
+
             auto optDBID = this->GetDBID();
 
             if (!optDBID)
