@@ -388,10 +388,17 @@ namespace /*CHI::*/Xact {
             if (!rspFlit.IsFromRequesterToHome(glbl))
                 return this->ResponseFlitDenied(XactDenial::DENIED_RSP_NOT_FROM_RN_TO_HN, rspFlit);
 
+            // CHI E.b 2.8.3 (p.2-116, MUST): "An RN-F sends a CompAck after
+            // receiving Comp, RespSepData, or CompData". The Comp arm is
+            // MakeReadUnique's, whose data response 4.2.1 (p.4-163) makes
+            // optional -- the bare Comp of Table 4-34 (p.4-213) is then the whole
+            // completion, and NextRSPNoRecord above accepts it for that opcode
+            // alone.
             if (
                 !this->HasDAT({ Opcodes::DAT::CompData })
 #ifdef CHI_ISSUE_EB_ENABLE
              && !this->HasRSP({ Opcodes::RSP::RespSepData })
+             && !this->HasRSP({ Opcodes::RSP::Comp })
 #endif
             )
 #ifdef CHI_ISSUE_EB_ENABLE
