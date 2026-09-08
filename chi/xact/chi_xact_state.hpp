@@ -218,6 +218,17 @@ namespace CHI {
             Opcodes::REQ::Decoder<Flits::REQ<config>, const details::RNCohTrans*>
                         reqDecoder;
 
+            // CHI E.b Table 4-33 (§4.7.1 p.4-211) splits ReadClean into two blocks by
+            // TagOp: Transfer carries every initial state, the rest only I and UCE --
+            // which Table 12-1 (§12.4.2 p.12-377) is what fixes.
+            const details::RNCohTrans*
+                        readCleanTransfer;
+
+        private:
+            const details::RNCohTrans* SelectREQTrans(
+                const details::RNCohTrans* trans,
+                const Flits::REQ<config>&  flit) const noexcept;
+
             Opcodes::SNP::Decoder<Flits::SNP<config>, const details::RNCohTrans*>
                         snpDecoder;
 
@@ -602,6 +613,7 @@ namespace /*CHI::*/Xact {
     inline RNCacheStateMap<config>::RNCacheStateMap() noexcept
         : reqDecoder                ()
         , snpDecoder                ()
+        , readCleanTransfer         (nullptr)
         , events                    (std::make_shared<EventHub>())
         , stateMap                  ()
         , enableSilentEviction      (true)
@@ -613,31 +625,35 @@ namespace /*CHI::*/Xact {
         , seerAccessedMap           ()
     {
         // REQ transitions
-        #define SET_REQ(type, opcode)  { \
-            static const details::RNCohTrans _##opcode { \
-                CacheStateTransitions::Initials::opcode, \
-                CacheStateTransitions::Responses::details::TableR0(), \
-                CacheStateTransitions::Intermediates::Nested::opcode, \
-                &CacheStateTransitions::Intermediates::opcode, \
-                CacheStateTransition::Type::type \
-            }; \
-            reqDecoder[Opcodes::REQ::opcode].SetCompanion(&_##opcode); \
-        }
-
-        #define SET_REQ_EX(type, opcode, name) { \
-            static const details::RNCohTrans _##name { \
+        #define RNCOH_TRANS(type, name) \
+            details::RNCohTrans { \
                 CacheStateTransitions::Initials::name, \
                 CacheStateTransitions::Responses::details::TableR0(), \
                 CacheStateTransitions::Intermediates::Nested::name, \
                 &CacheStateTransitions::Intermediates::name, \
                 CacheStateTransition::Type::type \
-            }; \
+            }
+
+        #define SET_REQ(type, opcode)  { \
+            static const details::RNCohTrans _##opcode = RNCOH_TRANS(type, opcode); \
+            reqDecoder[Opcodes::REQ::opcode].SetCompanion(&_##opcode); \
+        }
+
+        // The one REQ transition table selected by a field rather than by the opcode.
+        #define SET_REQ_ALT(type, name, member) { \
+            static const details::RNCohTrans _##name = RNCOH_TRANS(type, name); \
+            member = &_##name; \
+        }
+
+        #define SET_REQ_EX(type, opcode, name) { \
+            static const details::RNCohTrans _##name = RNCOH_TRANS(type, name); \
             reqDecoder[Opcodes::REQ::opcode].SetCompanion(&_##name); \
         }
 
     //  SET_REQ(General         , ReqLCrdReturn                   );  // 0x00
         SET_REQ(Read            , ReadShared                      );  // 0x01
         SET_REQ(Read            , ReadClean                       );  // 0x02
+        SET_REQ_ALT(Read        , ReadClean_Transfer, readCleanTransfer);
         SET_REQ(Read            , ReadOnce                        );  // 0x03
         SET_REQ(Read            , ReadNoSnp                       );  // 0x04
     //  SET_REQ(General         , PCrdReturn                      );  // 0x05
@@ -847,7 +863,9 @@ namespace /*CHI::*/Xact {
                                                             // 0x1F
 
         #undef SET_REQ
+        #undef SET_REQ_ALT
         #undef SET_REQ_EX
+        #undef RNCOH_TRANS
         #undef SET_SNP
         #undef SET_SNP_EX
         #undef SET_SNPFWD
@@ -1040,6 +1058,20 @@ namespace /*CHI::*/Xact {
     }
 
     template<FlitConfigurationConcept config>
+    inline const details::RNCohTrans* RNCacheStateMap<config>::SelectREQTrans(
+        const details::RNCohTrans*  trans,
+        const Flits::REQ<config>&   flit) const noexcept
+    {
+        if constexpr (requires { flit.TagOp(); })
+        {
+            if (flit.Opcode() == Opcodes::REQ::ReadClean
+             && flit.TagOp()  == TagOp::Transfer)
+                return readCleanTransfer;
+        }
+        return trans;
+    }
+
+    template<FlitConfigurationConcept config>
     inline XactDenialEnum RNCacheStateMap<config>::NextTXREQ(
         Flits::REQ<config>::addr_t::value_type  addr,
         uint64_t                                time,
@@ -1058,7 +1090,7 @@ namespace /*CHI::*/Xact {
                 "This Opcode cannot be decoded by RN TXREQ");
 
         //
-        const details::RNCohTrans* trans = opcodeInfo.GetCompanion();
+        const details::RNCohTrans* trans = SelectREQTrans(opcodeInfo.GetCompanion(), flit);
 
         if (!trans)
             return this->DeniedTXREQ(XactDenial::DENIED_REQ_OPCODE_NOT_SUPPORTED, nullptr, time, flit,
@@ -1299,7 +1331,7 @@ namespace /*CHI::*/Xact {
                 return this->DeniedTXDAT(XactDenial::DENIED_REQ_OPCODE_NOT_DECODED, &xaction, time, flit,
                     "This Opcode cannot be decoded by RN TXDAT");
 
-            trans = opcodeInfo.GetCompanion();
+            trans = SelectREQTrans(opcodeInfo.GetCompanion(), xaction.GetFirst().flit.req);
 
             if (!trans)
                 return this->DeniedTXDAT(XactDenial::DENIED_REQ_OPCODE_NOT_SUPPORTED, &xaction, time, flit,
@@ -1650,7 +1682,7 @@ namespace /*CHI::*/Xact {
                 return this->DeniedRXRSP(XactDenial::DENIED_REQ_OPCODE_NOT_DECODED, &xaction, time, flit,
                     "This Opcode cannot be decoded by RN RXRSP");
 
-            trans = opcodeInfo.GetCompanion();
+            trans = SelectREQTrans(opcodeInfo.GetCompanion(), xaction.GetFirst().flit.req);
 
             if (!trans)
                 return this->DeniedRXRSP(XactDenial::DENIED_REQ_OPCODE_NOT_SUPPORTED, &xaction, time, flit,
@@ -1882,7 +1914,7 @@ namespace /*CHI::*/Xact {
                 return this->DeniedRXDAT(XactDenial::DENIED_REQ_OPCODE_NOT_DECODED, &xaction, time, flit,
                     "This Opcode cannot be decoded by RN RXDAT");
 
-            trans = opcodeInfo.GetCompanion();
+            trans = SelectREQTrans(opcodeInfo.GetCompanion(), xaction.GetFirst().flit.req);
 
             if (!trans)
                 return this->DeniedRXDAT(XactDenial::DENIED_REQ_OPCODE_NOT_SUPPORTED, &xaction, time, flit,
@@ -2080,7 +2112,7 @@ namespace /*CHI::*/Xact {
                     return this->DeniedTXREQ(XactDenial::DENIED_REQ_OPCODE_NOT_DECODED, nestingXaction, time, nestingXaction->GetFirst().flit.req,
                         "This Opcode cannot be decoded by RN TXREQ");
 
-                trans = opcodeInfo.GetCompanion();
+                trans = SelectREQTrans(opcodeInfo.GetCompanion(), nestingXaction->GetFirst().flit.req);
 
                 if (!trans)
                     return this->DeniedTXREQ(XactDenial::DENIED_REQ_OPCODE_NOT_SUPPORTED, nestingXaction, time, nestingXaction->GetFirst().flit.req,
