@@ -78,7 +78,11 @@ void TCPtAInitialRead(
 
             ->ForkSilentTransitions("## A.2.1. Silent transitions: (Eviction = 0, Sharing = 0, Store = 0, Invalidation = 0)", false, false, false, false)
                 ->Leaf("### A.2.1.1. UC  -> ReadOnce ", Xact::CacheStates::UC , false)
-                ->Leaf("### A.2.1.2. UCE -> ReadOnce ", Xact::CacheStates::UCE, false)
+                // Table 4-4 (SS4.2.1 p.4-167) gives ReadOnce, ReadOnceCleanInvalid
+                // and ReadOnceMakeInvalid a Y in the UCE column. The expectations
+                // below said otherwise for all three, with every silent transition
+                // disabled, so the denial could not come from a widening either.
+                ->Leaf("### A.2.1.2. UCE -> ReadOnce ", Xact::CacheStates::UCE, true )
                 ->Leaf("### A.2.1.3. UD  -> ReadOnce ", Xact::CacheStates::UD , false)
                 ->Leaf("### A.2.1.4. UDP -> ReadOnce ", Xact::CacheStates::UDP, false)
                 ->Leaf("### A.2.1.5. SC  -> ReadOnce ", Xact::CacheStates::SC , false)
@@ -88,7 +92,7 @@ void TCPtAInitialRead(
 
             ->ForkSilentTransitions("## A.2.2. Silent transitions: (Eviction = 0, Sharing = 0, Store = 1, Invalidation = 0)", false, false, false, false)
                 ->Leaf("### A.2.2.1. UC  -> ReadOnce ", Xact::CacheStates::UC , false)
-                ->Leaf("### A.2.2.2. UCE -> ReadOnce ", Xact::CacheStates::UCE, false)
+                ->Leaf("### A.2.2.2. UCE -> ReadOnce ", Xact::CacheStates::UCE, true )
                 ->Leaf("### A.2.2.3. UD  -> ReadOnce ", Xact::CacheStates::UD , false)
                 ->Leaf("### A.2.2.4. UDP -> ReadOnce ", Xact::CacheStates::UDP, false)
                 ->Leaf("### A.2.2.5. SC  -> ReadOnce ", Xact::CacheStates::SC , false)
@@ -133,7 +137,7 @@ void TCPtAInitialRead(
 
             ->ForkSilentTransitions("## A.3.1. Silent transitions: (Eviction = 0, Sharing = 0, Store = 0, Invalidation = 0)", false, false, false, false)
                 ->Leaf("### A.3.1.1. UC  -> ReadOnceCleanInvalid ", Xact::CacheStates::UC , false)
-                ->Leaf("### A.3.1.2. UCE -> ReadOnceCleanInvalid ", Xact::CacheStates::UCE, false)
+                ->Leaf("### A.3.1.2. UCE -> ReadOnceCleanInvalid ", Xact::CacheStates::UCE, true )
                 ->Leaf("### A.3.1.3. UD  -> ReadOnceCleanInvalid ", Xact::CacheStates::UD , false)
                 ->Leaf("### A.3.1.4. UDP -> ReadOnceCleanInvalid ", Xact::CacheStates::UDP, false)
                 ->Leaf("### A.3.1.5. SC  -> ReadOnceCleanInvalid ", Xact::CacheStates::SC , false)
@@ -143,7 +147,7 @@ void TCPtAInitialRead(
 
             ->ForkSilentTransitions("## 3.2. Silent transitions: (Eviction = 0, Sharing = 0, Store = 1, Invalidation = 0)", false, false, false, false)
                 ->Leaf("### A.3.2.1. UC  -> ReadOnceCleanInvalid ", Xact::CacheStates::UC , false)
-                ->Leaf("### A.3.2.2. UCE -> ReadOnceCleanInvalid ", Xact::CacheStates::UCE, false)
+                ->Leaf("### A.3.2.2. UCE -> ReadOnceCleanInvalid ", Xact::CacheStates::UCE, true )
                 ->Leaf("### A.3.2.3. UD  -> ReadOnceCleanInvalid ", Xact::CacheStates::UD , false)
                 ->Leaf("### A.3.2.4. UDP -> ReadOnceCleanInvalid ", Xact::CacheStates::UDP, false)
                 ->Leaf("### A.3.2.5. SC  -> ReadOnceCleanInvalid ", Xact::CacheStates::SC , false)
@@ -188,7 +192,7 @@ void TCPtAInitialRead(
 
             ->ForkSilentTransitions("## A.4.1. Silent transitions: (Eviction = 0, Sharing = 0, Store = 0, Invalidation = 0)", false, false, false, false)
                 ->Leaf("### A.4.1.1. UC  -> ReadOnceMakeInvalid ", Xact::CacheStates::UC , false)
-                ->Leaf("### A.4.1.2. UCE -> ReadOnceMakeInvalid ", Xact::CacheStates::UCE, false)
+                ->Leaf("### A.4.1.2. UCE -> ReadOnceMakeInvalid ", Xact::CacheStates::UCE, true )
                 ->Leaf("### A.4.1.3. UD  -> ReadOnceMakeInvalid ", Xact::CacheStates::UD , false)
                 ->Leaf("### A.4.1.4. UDP -> ReadOnceMakeInvalid ", Xact::CacheStates::UDP, false)
                 ->Leaf("### A.4.1.5. SC  -> ReadOnceMakeInvalid ", Xact::CacheStates::SC , false)
@@ -198,7 +202,7 @@ void TCPtAInitialRead(
 
             ->ForkSilentTransitions("## A.4.2. Silent transitions: (Eviction = 0, Sharing = 0, Store = 1, Invalidation = 0)", false, false, false, false)
                 ->Leaf("### A.4.2.1. UC  -> ReadOnceMakeInvalid ", Xact::CacheStates::UC , false)
-                ->Leaf("### A.4.2.2. UCE -> ReadOnceMakeInvalid ", Xact::CacheStates::UCE, false)
+                ->Leaf("### A.4.2.2. UCE -> ReadOnceMakeInvalid ", Xact::CacheStates::UCE, true )
                 ->Leaf("### A.4.2.3. UD  -> ReadOnceMakeInvalid ", Xact::CacheStates::UD , false)
                 ->Leaf("### A.4.2.4. UDP -> ReadOnceMakeInvalid ", Xact::CacheStates::UDP, false)
                 ->Leaf("### A.4.2.5. SC  -> ReadOnceMakeInvalid ", Xact::CacheStates::SC , false)
@@ -558,9 +562,17 @@ void TCPtAInitialRead(
 
             ->ForkSilentTransitions("## A.10.5. Silent transitions: (Eviction = 1, Sharing = 1, Store = 1, Invalidation = 1)", true, true, true, true)
                 ->Leaf("### A.10.5.1. UC  -> MakeReadUnique ", Xact::CacheStates::UC , true )
-                ->Leaf("### A.10.5.2. UCE -> MakeReadUnique ", Xact::CacheStates::UCE, false)
+                // Table 4-32 (SS4.6 p.4-209): "Any silent transition that results in
+                // the cache line being in UD, UDP, or SC state can undergo a further
+                // silent transition." UCE -> UD is its Store row and UD -> SD its
+                // Local sharing row, so a line recorded UCE may truly be SD, which
+                // Table 4-4 (SS4.2 p.4-167) permits MakeReadUnique from. Denied here
+                // only while EvaluateSilently() applied its groups once in a fixed
+                // order -- this group already accepted the ONE-step UC and UD.
+                ->Leaf("### A.10.5.2. UCE -> MakeReadUnique ", Xact::CacheStates::UCE, true )
                 ->Leaf("### A.10.5.3. UD  -> MakeReadUnique ", Xact::CacheStates::UD , true )
-                ->Leaf("### A.10.5.4. UDP -> MakeReadUnique ", Xact::CacheStates::UDP, false)
+                // UDP -> UD ("Store that fills the cache line") -> SD, same rule.
+                ->Leaf("### A.10.5.4. UDP -> MakeReadUnique ", Xact::CacheStates::UDP, true )
                 ->Leaf("### A.10.5.5. SC  -> MakeReadUnique ", Xact::CacheStates::SC , true )
                 ->Leaf("### A.10.5.6. SD  -> MakeReadUnique ", Xact::CacheStates::SD , true )
                 ->Leaf("### A.10.5.7. I   -> MakeReadUnique ", Xact::CacheStates::I  , false)

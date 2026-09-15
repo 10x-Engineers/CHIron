@@ -321,7 +321,7 @@ namespace CHI {
             XactDenialEnum  NextRXDAT(Flits::REQ<config>::addr_t::value_type addr, uint64_t time, const Xaction<config>& xaction, const Flits::DAT<config>& flit) noexcept;
 
         public:
-            XactDenialEnum  Transfer(Flits::REQ<config>::addr_t::value_type addr, CacheState state, const Xaction<config>* nestingXaction = nullptr) noexcept;
+            XactDenialEnum  Transfer(Flits::REQ<config>::addr_t::value_type addr, CacheState state, uint64_t time = 0, const Xaction<config>* nestingXaction = nullptr) noexcept;
         };
     }
 /*
@@ -909,42 +909,58 @@ namespace /*CHI::*/Xact {
     template<FlitConfigurationConcept config>
     inline CacheState RNCacheStateMap<config>::EvaluateSilently(CacheState state) const noexcept
     {
-        // silent transitions
-
-        /* Cache eviction */
-        if (enableSilentEviction)
-        {
-            if (state.UC || state.UCE || state.SC)
-                state.I = true;
-        }
-
-        /* Local sharing */
-        if (enableSilentSharing)
-        {
-            if (state.UC)
-                state.SC = true;
-
-            if (state.UD)
-                state.SD = true;
-        }
-
-        /* Store */
-        if (enableSilentStore)
-        {
-            if (state.UC || state.UCE || state.UDP)
-                state.UD = true;
-
-            if (state.UCE)
-                state.UDP = true;
-        }
-        
-        /* Cache Invalidate */
-        if (enableSilentInvalidation)
-        {
-            if (state.UD || state.UDP)
-                state.I = true;
-        }
+        // CHI E.b Table 4-32 (SS4.6 p.4-209) is a relation, not a list applied once:
+        // "Sequences of silent transitions can also occur. Any silent transition that
+        // results in the cache line being in UD, UDP, or SC state can undergo a
+        // further silent transition." Applying the four groups in a fixed order
+        // therefore misses every state only a SEQUENCE reaches -- with sharing ahead
+        // of store, the store's UD is never offered back to sharing, so neither UC
+        // nor UCE ever widens to SD. That is an UNDER-widening, which convicts a
+        // conformant Requester rather than missing a violation.
         //
+        // Iterated to a fixpoint instead. The lattice has seven elements and each
+        // pass only ever adds, so it converges in at most seven.
+        for (int pass = 0; pass < 7; pass++)
+        {
+            const CacheState before = state;
+
+            /* Cache eviction */
+            if (enableSilentEviction)
+            {
+                if (state.UC || state.UCE || state.SC)
+                    state.I = true;
+            }
+
+            /* Local sharing */
+            if (enableSilentSharing)
+            {
+                if (state.UC)
+                    state.SC = true;
+
+                if (state.UD)
+                    state.SD = true;
+            }
+
+            /* Store */
+            if (enableSilentStore)
+            {
+                if (state.UC || state.UCE || state.UDP)
+                    state.UD = true;
+
+                if (state.UCE)
+                    state.UDP = true;
+            }
+
+            /* Cache Invalidate */
+            if (enableSilentInvalidation)
+            {
+                if (state.UD || state.UDP)
+                    state.I = true;
+            }
+
+            if (state == before)
+                break;
+        }
 
         return state;
     }
@@ -2086,10 +2102,16 @@ namespace /*CHI::*/Xact {
         return XactDenial::ACCEPTED;
     }
 
+    // `time` is the denial timestamp the Denied*() reporters take. Without it the
+    // two DeniedTXREQ() calls below bound `time` to ::time from <ctime>, which is a
+    // function pointer: the nested-transfer denial path could not compile under a
+    // conforming C++20 front end, and reported a meaningless timestamp under one
+    // that accepted the conversion.
     template<FlitConfigurationConcept config>
     inline XactDenialEnum RNCacheStateMap<config>::Transfer(
         Flits::REQ<config>::addr_t::value_type    addr,
         CacheState                                state,
+        uint64_t                                  time,
         const Xaction<config>*                    nestingXaction) noexcept
     {
         if (!nestingXaction)

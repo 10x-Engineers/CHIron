@@ -342,9 +342,9 @@ TCPtResp* TCPtResp::TestAndForkTransfer(std::string title, Xact::CacheState init
         (*totalCount)++;
 
     if (isSNP)
-        denial = forked->rnStates.Transfer(Flits::REQ<config>::addr_t::value_type(snp.Addr()) << 3, intermediate, forked->xaction.get());
+        denial = forked->rnStates.Transfer(Flits::REQ<config>::addr_t::value_type(snp.Addr()) << 3, intermediate, 0, forked->xaction.get());
     else
-        denial = forked->rnStates.Transfer(req.Addr(), intermediate, forked->xaction.get());
+        denial = forked->rnStates.Transfer(req.Addr(), intermediate, 0, forked->xaction.get());
 
     if (denial == Xact::XactDenial::ACCEPTED)
     {
@@ -417,9 +417,9 @@ TCPtResp* TCPtResp::TestAndLeafTransfer(std::string title, Xact::CacheState init
         (*totalCount)++;
 
     if (isSNP)
-        denial = forked->rnStates.Transfer(Flits::REQ<config>::addr_t::value_type(snp.Addr()) << 3, intermediate, forked->xaction.get());
+        denial = forked->rnStates.Transfer(Flits::REQ<config>::addr_t::value_type(snp.Addr()) << 3, intermediate, 0, forked->xaction.get());
     else
-        denial = forked->rnStates.Transfer(req.Addr(), intermediate, forked->xaction.get());
+        denial = forked->rnStates.Transfer(req.Addr(), intermediate, 0, forked->xaction.get());
 
     if ((denial == Xact::XactDenial::ACCEPTED) == accept)
     {
