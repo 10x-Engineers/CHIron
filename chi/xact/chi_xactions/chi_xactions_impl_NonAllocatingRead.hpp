@@ -367,7 +367,9 @@ namespace /*CHI::*/Xact {
             else
                 firstDBID = true;
 
-            hasDBID = true;
+            // CHI E.b SS2.5.9 (p.2-90): the DBID of a Read without CompAck may be any
+            // value, so it holds no DBID a later response could collide with.
+            hasDBID = this->first.flit.req.ExpCompAck();
 
             //
             if (glbl.CHECK_FIELD_MAPPING.enable)
@@ -497,7 +499,8 @@ namespace /*CHI::*/Xact {
             else
                 firstDBID = true;
 
-            hasDBID = true;
+            // CHI E.b SS2.5.9 (p.2-90): see NextRSPNoRecord().
+            hasDBID = this->first.flit.req.ExpCompAck();
 
             // check DMT/DCT consistency
             if (auto optDMTSrcID = this->GetDMTSrcID(glbl))
